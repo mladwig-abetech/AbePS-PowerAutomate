@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Power Automate Flow Monitor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #4a90e2, #357abd);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            font-weight: 300;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1rem;
+        }
+
+        .main-content {
+            padding: 30px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #ffffff, #f8fafc);
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+            border-left: 5px solid;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-card.success { border-left-color: #10b981; }
+        .stat-card.warning { border-left-color: #f59e0b; }
+        .stat-card.error { border-left-color: #ef4444; }
+        .stat-card.info { border-left-color: #3b82f6; }
+
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .stat-card.success .stat-number { color: #10b981; }
+        .stat-card.warning .stat-number { color: #f59e0b; }
+        .stat-card.error .stat-number { color: #ef4444; }
+        .stat-card.info .stat-number { color: #3b82f6; }
+
+        .stat-label {
+            color: #6b7280;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.9rem;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #4a90e2, #357abd);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(74, 144, 226, 0.4);
+        }
+
+        .btn-secondary {
+            background: #f3f4f6;
+            color: #374151;
+        }
+
+        .btn-secondary:hover {
+            background: #e5e7eb;
+        }
+
+        .search-box {
+            flex: 1;
+            min-width: 200px;
+            padding: 12px 16px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            transition: border-color 0.3s ease;
+        }
+
+        .search-box:focus {
+            outline: none;
+            border-color: #4a90e2;
+        }
+
+        .flows-section {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.05);
+            overflow: hidden;
+        }
+
+        .section-header {
+            background: #f8fafc;
+            padding: 20px 25px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .section-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: #1f2937;
+        }
+
+        .flows-list {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .flow-item {
+            padding: 20px 25px;
+            border-bottom: 1px solid #f3f4f6;
+            transition: background-color 0.3s ease;
+        }
+
+        .flow-item:hover {
+            background: #fafbfc;
+        }
+
+        .flow-item:last-child {
+            border-bottom: none;
+        }
+
+        .flow-header {
+            display: flex;
+            justify-content: between;
+            align-items: flex-start;
+            margin-bottom: 12px;
+        }
+
+        .flow-name {
+            font-weight: 600;
+            font-size: 1.1rem;
+            color: #1f2937;
+            margin-bottom: 5px;
+        }
+
+        .flow-status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            margin-left: auto;
+        }
+
+        .status-running { background: #dbeafe; color: #1e40af; }
+        .status-succeeded { background: #d1fae5; color: #065f46; }
+        .status-failed { background: #fee2e2; color: #991b1b; }
+        .status-suspended { background: #fef3c7; color: #92400e; }
+
+        .flow-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            color: #6b7280;
+            font-size: 0.85rem;
+        }
+
+        .flow-metric {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .metric-label {
+            font-weight: 500;
+            margin-bottom: 2px;
+        }
+
+        .metric-value {
+            font-size: 0.9rem;
+            color: #374151;
+        }
+
+        .alert-banner {
+            background: linear-gradient(135deg, #fee2e2, #fecaca);
+            border-left: 5px solid #ef4444;
+            padding: 15px 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .alert-banner.show {
+            display: block;
+            animation: slideDown 0.3s ease;
+        }
+
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #6b7280;
+        }
+
+        .spinner {
+            border: 3px solid #f3f4f6;
+            border-top: 3px solid #4a90e2;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .config-panel {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.05);
+        }
+
+        .config-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 15px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-label {
+            font-weight: 500;
+            color: #374151;
+            margin-bottom: 5px;
+        }
+
+        .form-input {
+            padding: 10px 12px;
+            border: 2px solid #e5e7eb;
+            border-radius: 6px;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: #4a90e2;
+        }
+
+        @media (max-width: 768px) {
+            .config-row {
+                grid-template-columns: 1fr;
+            }
+            
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔄 Power Automate Monitor</h1>
+            <p>Real-time monitoring and alerting for your Microsoft Power Automate flows</p>
+        </div>
+
+        <div class="main-content">
+            <div class="config-panel">
+                <h3 style="margin-bottom: 20px; color: #1f2937;">Configuration</h3>
+                <div class="config-row">
+                    <div class="form-group">
+                        <label class="form-label">Environment URL</label>
+                        <input type="text" class="form-input" id="environmentUrl" placeholder="https://yourtenant.crm.dynamics.com/">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Refresh Interval (seconds)</label>
+                        <input type="number" class="form-input" id="refreshInterval" value="30" min="10">
+                    </div>
+                </div>
+                <div class="config-row">
+                    <div class="form-group">
+                        <label class="form-label">Client ID</label>
+                        <input type="text" class="form-input" id="clientId" placeholder="Your Azure AD App Client ID">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Tenant ID</label>
+                        <input type="text" class="form-input" id="tenantId" placeholder="Your Azure AD Tenant ID">
+                    </div>
+                </div>
+            </div>
+
+            <div class="alert-banner" id="alertBanner">
+                <strong>⚠️ Alert:</strong> <span id="alertMessage"></span>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-card success">
+                    <div class="stat-number" id="successCount">0</div>
+                    <div class="stat-label">Successful Flows</div>
+                </div>
+                <div class="stat-card error">
+                    <div class="stat-number" id="failureCount">0</div>
+                    <div class="stat-label">Failed Flows</div>
+                </div>
+                <div class="stat-card warning">
+                    <div class="stat-number" id="suspendedCount">0</div>
+                    <div class="stat-label">Suspended Flows</div>
+                </div>
+                <div class="stat-card info">
+                    <div class="stat-number" id="totalFlows">0</div>
+                    <div class="stat-label">Total Flows</div>
+                </div>
+            </div>
+
+            <div class="controls">
+                <button class="btn btn-primary" id="connectBtn">🔌 Connect to Power Platform</button>
+                <button class="btn btn-secondary" id="refreshBtn">🔄 Refresh Data</button>
+                <button class="btn btn-secondary" id="exportBtn">📊 Export Report</button>
+                <input type="text" class="search-box" id="searchBox" placeholder="🔍 Search flows by name...">
+            </div>
+
+            <div class="flows-section">
+                <div class="section-header">
+                    <div class="section-title">Flow Status Monitor</div>
+                </div>
+                <div class="flows-list" id="flowsList">
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        <p>Click "Connect to Power Platform" to start monitoring your flows</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class PowerAutomateMonitor {
+            constructor() {
+                this.flows = [];
+                this.isConnected = false;
+                this.refreshTimer = null;
+                this.initializeEventListeners();
+                this.generateMockData(); // For demonstration
+            }
+
+            initializeEventListeners() {
+                document.getElementById('connectBtn').addEventListener('click', () => this.connect());
+                document.getElementById('refreshBtn').addEventListener('click', () => this.refreshData());
+                document.getElementById('exportBtn').addEventListener('click', () => this.exportReport());
+                document.getElementById('searchBox').addEventListener('input', (e) => this.filterFlows(e.target.value));
+            }
+
+            generateMockData() {
+                // Generate realistic mock data for demonstration
+                const mockFlows = [
+                    { id: '001', name: 'Daily Sales Report Automation', status: 'Succeeded', lastRun: new Date(Date.now() - 1000 * 60 * 30), duration: '2m 15s', runs: 145, successRate: 98.6 },
+                    { id: '002', name: 'Customer Onboarding Workflow', status: 'Failed', lastRun: new Date(Date.now() - 1000 * 60 * 45), duration: '1m 32s', runs: 89, successRate: 94.4, error: 'Connection timeout to SharePoint' },
+                    { id: '003', name: 'Invoice Processing Pipeline', status: 'Running', lastRun: new Date(Date.now() - 1000 * 60 * 5), duration: '3m 45s', runs: 267, successRate: 99.2 },
+                    { id: '004', name: 'HR Leave Request Handler', status: 'Succeeded', lastRun: new Date(Date.now() - 1000 * 60 * 120), duration: '45s', runs: 56, successRate: 100.0 },
+                    { id: '005', name: 'Email Marketing Campaigns', status: 'Suspended', lastRun: new Date(Date.now() - 1000 * 60 * 180), duration: '4m 12s', runs: 234, successRate: 96.8 },
+                    { id: '006', name: 'Inventory Stock Alerts', status: 'Succeeded', lastRun: new Date(Date.now() - 1000 * 60 * 15), duration: '1m 8s', runs: 445, successRate: 97.3 },
+                    { id: '007', name: 'Teams Meeting Scheduler', status: 'Failed', lastRun: new Date(Date.now() - 1000 * 60 * 60), duration: '2m 30s', runs: 78, successRate: 91.0, error: 'Microsoft Graph API rate limit exceeded' }
+                ];
+
+                this.flows = mockFlows;
+                this.updateStats();
+                this.renderFlows();
+            }
+
+            connect() {
+                const connectBtn = document.getElementById('connectBtn');
+                const originalText = connectBtn.textContent;
+                
+                connectBtn.textContent = '🔄 Connecting...';
+                connectBtn.disabled = true;
+
+                // Simulate connection process
+                setTimeout(() => {
+                    this.isConnected = true;
+                    connectBtn.textContent = '✅ Connected';
+                    connectBtn.className = 'btn btn-secondary';
+                    
+                    this.showAlert('Successfully connected to Power Platform! Monitoring active flows.', 'success');
+                    this.startAutoRefresh();
+                    
+                    setTimeout(() => {
+                        connectBtn.disabled = false;
+                    }, 2000);
+                }, 2000);
+            }
+
+            refreshData() {
+                if (!this.isConnected) {
+                    this.showAlert('Please connect to Power Platform first.', 'warning');
+                    return;
+                }
+
+                // Simulate data refresh with some random updates
+                this.flows.forEach(flow => {
+                    if (Math.random() < 0.3) { // 30% chance to update
+                        const statuses = ['Succeeded', 'Failed', 'Running'];
+                        const randomStatus = statuses[Math.floor(Math.random() * statuses.length)];
+                        if (flow.status !== 'Running') {
+                            flow.status = randomStatus;
+                            flow.lastRun = new Date();
+                        }
+                    }
+                });
+
+                this.updateStats();
+                this.renderFlows();
+                this.showAlert('Data refreshed successfully!', 'success');
+            }
+
+            startAutoRefresh() {
+                const interval = parseInt(document.getElementById('refreshInterval').value) * 1000;
+                
+                if (this.refreshTimer) {
+                    clearInterval(this.refreshTimer);
+                }
+
+                this.refreshTimer = setInterval(() => {
+                    this.refreshData();
+                }, interval);
+            }
+
+            updateStats() {
+                const stats = this.flows.reduce((acc, flow) => {
+                    acc.total++;
+                    switch (flow.status) {
+                        case 'Succeeded': acc.success++; break;
+                        case 'Failed': acc.failure++; break;
+                        case 'Suspended': acc.suspended++; break;
+                    }
+                    return acc;
+                }, { success: 0, failure: 0, suspended: 0, total: 0 });
+
+                document.getElementById('successCount').textContent = stats.success;
+                document.getElementById('failureCount').textContent = stats.failure;
+                document.getElementById('suspendedCount').textContent = stats.suspended;
+                document.getElementById('totalFlows').textContent = stats.total;
+            }
+
+            renderFlows() {
+                const flowsList = document.getElementById('flowsList');
+                
+                if (this.flows.length === 0) {
+                    flowsList.innerHTML = '<div class="loading"><p>No flows found.</p></div>';
+                    return;
+                }
+
+                flowsList.innerHTML = this.flows.map(flow => `
+                    <div class="flow-item">
+                        <div class="flow-header">
+                            <div>
+                                <div class="flow-name">${flow.name}</div>
+                                <span class="flow-status status-${flow.status.toLowerCase()}">${flow.status}</span>
+                            </div>
+                        </div>
+                        <div class="flow-details">
+                            <div class="flow-metric">
+                                <span class="metric-label">Last Run</span>
+                                <span class="metric-value">${this.formatTimeAgo(flow.lastRun)}</span>
+                            </div>
+                            <div class="flow-metric">
+                                <span class="metric-label">Duration</span>
+                                <span class="metric-value">${flow.duration}</span>
+                            </div>
+                            <div class="flow-metric">
+                                <span class="metric-label">Total Runs</span>
+                                <span class="metric-value">${flow.runs}</span>
+                            </div>
+                            <div class="flow-metric">
+                                <span class="metric-label">Success Rate</span>
+                                <span class="metric-value">${flow.successRate}%</span>
+                            </div>
+                            ${flow.error ? `<div class="flow-metric"><span class="metric-label">Error</span><span class="metric-value" style="color: #ef4444;">${flow.error}</span></div>` : ''}
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            filterFlows(searchTerm) {
+                const filteredFlows = this.flows.filter(flow => 
+                    flow.name.toLowerCase().includes(searchTerm.toLowerCase())
+                );
+                
+                const flowsList = document.getElementById('flowsList');
+                if (filteredFlows.length === 0 && searchTerm) {
+                    flowsList.innerHTML = '<div class="loading"><p>No flows match your search criteria.</p></div>';
+                    return;
+                }
+                
+                // Temporarily store original flows and update with filtered
+                const originalFlows = this.flows;
+                this.flows = filteredFlows;
+                this.renderFlows();
+                this.flows = originalFlows;
+            }
+
+            formatTimeAgo(date) {
+                const seconds = Math.floor((new Date() - date) / 1000);
+                
+                if (seconds < 60) return `${seconds}s ago`;
+                if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+                if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+                return `${Math.floor(seconds / 86400)}d ago`;
+            }
+
+            showAlert(message, type = 'info') {
+                const alertBanner = document.getElementById('alertBanner');
+                const alertMessage = document.getElementById('alertMessage');
+                
+                alertMessage.textContent = message;
+                alertBanner.className = `alert-banner show ${type}`;
+                
+                setTimeout(() => {
+                    alertBanner.classList.remove('show');
+                }, 5000);
+            }
+
+            exportReport() {
+                const report = {
+                    timestamp: new Date().toISOString(),
+                    summary: {
+                        totalFlows: this.flows.length,
+                        succeeded: this.flows.filter(f => f.status === 'Succeeded').length,
+                        failed: this.flows.filter(f => f.status === 'Failed').length,
+                        suspended: this.flows.filter(f => f.status === 'Suspended').length,
+                    },
+                    flows: this.flows
+                };
+
+                const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `power-automate-report-${new Date().toISOString().split('T')[0]}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                this.showAlert('Report exported successfully!', 'success');
+            }
+        }
+
+        // Initialize the monitor when the page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            new PowerAutomateMonitor();
+        });
+    </script>
+</body>
+</html>
