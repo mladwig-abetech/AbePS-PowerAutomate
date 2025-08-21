@@ -1411,4 +1411,437 @@
                     
                     if (flow.runHistory) {
                         const recentFails = flow.runHistory
+                            .slice(0, 5) // Last 5 runs
+                            .filter(run => run.status === 'Failed').length;
+                        if (recentFails > 0) acc.recentFailures++;
+                    }
+                    
+                    return acc;
+                }, { enabled: 0, suspended: 0, recentFailures: 0, total: 0 });
+
+                document.getElementById('enabledCount').textContent = stats.enabled;
+                document.getElementById('suspendedCount').textContent = stats.suspended;
+                document.getElementById('failedRunsCount').textContent = stats.recentFailures;
+                document.getElementById('totalFlows').textContent = stats.total;
+            }
+
+            renderFlows() {
+                const flowsList = document.getElementById('flowsList');
+                
+                if (this.filteredFlows.length === 0) {
+                    flowsList.innerHTML = '<div class="loading"><p>No flows found.</p></div>';
+                    return;
+                }
+
+                flowsList.innerHTML = this.filteredFlows.map(flow => {
+                    const flowStatus = flow.statecode === 1 ? 'enabled' : 'suspended';
+                    const lastRun = flow.lastRunTime ? new Date(flow.lastRunTime) : new Date(flow.modifiedon);
+                    const runStatus = flow.lastRunStatus ? flow.lastRunStatus.toLowerCase() : 'unknown';
+                    
+                    return `
+                        <div class="flow-item">
+                            <div class="flow-header">
+                                <div>
+                                    <div class="flow-name">${flow.name}</div>
+                                    <span class="flow-status status-${flowStatus}">${flowStatus.charAt(0).toUpperCase() + flowStatus.slice(1)}</span>
+                                    ${flow.lastRunStatus ? `<span class="flow-status run-status-${runStatus}" style="margin-left: 8px;">Last Run: ${flow.lastRunStatus}</span>` : ''}
+                                </div>
+                            </div>
+                            <div class="flow-details">
+                                <div class="flow-metric">
+                                    <span class="metric-label">Last Activity</span>
+                                    <span class="metric-value">${this.formatTimeAgo(lastRun)}</span>
+                                </div>
+                                <div class="flow-metric">
+                                    <span class="metric-label">Category</span>
+                                    <span class="metric-value">${flow.category}</span>
+                                </div>
+                                <div class="flow-metric">
+                                    <span class="metric-label">Total Runs</span>
+                                    <span class="metric-value">${flow.runHistory ? flow.runHistory.length : '-'}</span>
+                                </div>
+                                <div class="flow-metric">
+                                    <span class="metric-label">Failure Rate</span>
+                                    <span class="metric-value">${flow.failureRate}%</span>
+                                </div>
+                                <div class="flow-metric">
+                                    <span class="metric-label">Created</span>
+                                    <span class="metric-value">${this.formatDate(new Date(flow.createdon))}</span>
+                                </div>
+                            </div>
+                            ${flow.runHistory && flow.runHistory[0]?.error ? `<div class="error-message">Latest Error: ${flow.runHistory[0].error}</div>` : ''}
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            filterFlows(searchTerm) {
+                if (!searchTerm.trim()) {
+                    this.filteredFlows = [...this.flows];
+                } else {
+                    this.filteredFlows = this.flows.filter(flow => 
+                        flow.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                        flow.category.toLowerCase().includes(searchTerm.toLowerCase())
+                    );
+                }
+                
+                this.renderFlows();
+            }
+
+            formatTimeAgo(date) {
+                const seconds = Math.floor((new Date() - date) / 1000);
+                
+                if (seconds < 60) return `${seconds}s ago`;
+                if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+                if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+                return `${Math.floor(seconds / 86400)}d ago`;
+            }
+
+            formatDate(date) {
+                return date.toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric'
+                });
+            }
+
+            updateLastUpdated() {
+                const now = new Date();
+                document.getElementById('lastUpdated').textContent = 
+                    `Last updated: ${now.toLocaleTimeString()}`;
+            }
+
+            showLoading() {
+                const flowsList = document.getElementById('flowsList');
+                flowsList.innerHTML = `
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        <p>Loading flow data...</p>
+                    </div>
+                `;
+            }
+
+            showAlert(message, type = 'info') {
+                const alertBanner = document.getElementById('alertBanner');
+                const alertMessage = document.getElementById('alertMessage');
+                const alertIcon = document.getElementById('alertIcon');
+                
+                const icons = {
+                    success: '✅',
+                    error: '❌',
+                    warning: '⚠️',
+                    info: 'ℹ️'
+                };
+                
+                alertIcon.textContent = icons[type] || icons.info;
+                alertMessage.textContent = message;
+                alertBanner.className = `alert-banner show ${type}`;
+                
+                setTimeout(() => {
+                    alertBanner.classList.remove('show');
+                }, 5000);
+            }
+
+            exportReport() {
+                if (this.flows.length === 0) {
+                    this.showAlert('No data available to export.', 'warning');
+                    return;
+                }
+
+                const report = {
+                    timestamp: new Date().toISOString(),
+                    environment: this.config.environmentUrl,
+                    summary: {
+                        totalFlows: this.flows.length,
+                        enabled: this.flows.filter(f => f.statecode === 1).length,
+                        suspended: this.flows.filter(f => f.statecode === 0).length,
+                        withRecentFailures: this.flows.filter(f => f.failureRate > 0).length,
+                    },
+                    flows: this.flows.map(flow => ({
+                        id: flow.workflowid,
+                        name: flow.name,
+                        category: flow.category,
+                        status: flow.statecode === 1 ? 'Enabled' : 'Suspended',
+                        lastRunStatus: flow.lastRunStatus,
+                        failureRate: flow.failureRate,
+                        created: flow.createdon,
+                        modified: flow.modifiedon,
+                        runCount: flow.runHistory ? flow.runHistory.length : 0
+                    }))
+                };
+
+                const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `power-automate-report-${new Date().toISOString().split('T')[0]}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                this.showAlert('Report exported successfully!', 'success');
+            }
+
+            delay(ms) {
+                return new Promise(resolve => setTimeout(resolve, ms));
+            }
+        }
+
+        // Initialize the monitor when the page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            new PowerAutomateMonitor();
+        });
+
+            async authenticate() {
+                const { clientId, tenantId } = this.config;
+                
+                // Using Microsoft Authentication Library (MSAL) approach
+                // In a real implementation, you would use MSAL.js library
+                const authUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize`;
+                const redirectUri = encodeURIComponent(window.location.origin);
+                const scope = encodeURIComponent('https://service.powerapps.com//.default');
+                
+                // For this demo, we'll simulate the authentication process
+                // In production, implement proper OAuth 2.0 flow with MSAL.js
+                this.showAlert('Authentication would redirect to Microsoft login...', 'warning');
+                
+                // Simulate token for demonstration
+                await this.delay(1000);
+                this.accessToken = 'simulated-access-token';
+            }
+
+            async fetchFlows() {
+                if (!this.accessToken) {
+                    throw new Error('No valid access token available');
+                }
+
+                const { environmentUrl } = this.config;
+                
+                try {
+                    this.showLoading();
+                    
+                    // Construct the API endpoint for Power Automate flows
+                    const apiEndpoint = `${environmentUrl}/api/data/v9.0/workflows`;
+                    const queryParams = new URLSearchParams({
+                        '$select': 'workflowid,name,statecode,statuscode,createdon,modifiedon,category',
+                        '$filter': "category eq 5", // Category 5 = Modern Flow
+                        '$orderby': 'modifiedon desc',
+                        '$top': '100'
+                    });
+
+                    // In a real implementation, make the actual API call
+                    // const response = await this.makeApiCall(`${apiEndpoint}?${queryParams}`);
+                    
+                    // For demonstration, simulate API response
+                    await this.delay(1500);
+                    const simulatedFlows = this.generateRealisticFlowData();
+                    
+                    this.flows = simulatedFlows;
+                    this.filteredFlows = [...this.flows];
+                    this.updateStats();
+                    this.renderFlows();
+                    this.updateLastUpdated();
+                    
+                    // Fetch run history for each flow
+                    await this.fetchFlowRunHistory();
+                    
+                } catch (error) {
+                    throw new Error(`Failed to fetch flows: ${error.message}`);
+                }
+            }
+
+            async fetchFlowRunHistory() {
+                // Fetch recent run history for each flow to determine health status
+                const promises = this.flows.slice(0, 10).map(async (flow) => {
+                    try {
+                        // In production: GET /api/data/v9.0/workflowlogs
+                        await this.delay(200); // Simulate API call
+                        
+                        // Simulate run history data
+                        const runHistory = this.generateFlowRunHistory(flow.workflowid);
+                        flow.runHistory = runHistory;
+                        flow.lastRunStatus = runHistory[0]?.status || 'Unknown';
+                        flow.lastRunTime = runHistory[0]?.completedOn || flow.modifiedon;
+                        flow.failureRate = this.calculateFailureRate(runHistory);
+                        
+                    } catch (error) {
+                        console.warn(`Failed to fetch run history for ${flow.name}:`, error);
+                        flow.lastRunStatus = 'Unknown';
+                        flow.failureRate = 0;
+                    }
+                });
+
+                await Promise.all(promises);
+                this.updateStats();
+                this.renderFlows();
+            }
+
+            generateRealisticFlowData() {
+                const flowTemplates = [
+                    { name: 'Daily Sales Report Automation', category: 'Business Process' },
+                    { name: 'Customer Onboarding Workflow', category: 'HR & Onboarding' },
+                    { name: 'Invoice Processing Pipeline', category: 'Finance & Accounting' },
+                    { name: 'Email Marketing Campaign Trigger', category: 'Marketing' },
+                    { name: 'IT Ticket Assignment Handler', category: 'IT Operations' },
+                    { name: 'Contract Approval Workflow', category: 'Legal & Compliance' },
+                    { name: 'Inventory Stock Level Alerts', category: 'Supply Chain' },
+                    { name: 'Employee Leave Request Handler', category: 'HR & Onboarding' },
+                    { name: 'Social Media Content Scheduler', category: 'Marketing' },
+                    { name: 'Data Backup Validation Process', category: 'IT Operations' }
+                ];
+
+                return flowTemplates.map((template, index) => ({
+                    workflowid: `flow-${String(index + 1).padStart(3, '0')}`,
+                    name: template.name,
+                    category: template.category,
+                    statecode: Math.random() > 0.1 ? 1 : 0, // 90% enabled
+                    statuscode: Math.random() > 0.05 ? 1 : 2, // 95% active
+                    createdon: new Date(Date.now() - Math.random() * 90 * 24 * 60 * 60 * 1000).toISOString(),
+                    modifiedon: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString(),
+                    runHistory: [],
+                    lastRunStatus: 'Unknown',
+                    lastRunTime: null,
+                    failureRate: 0
+                }));
+            }
+
+            generateFlowRunHistory(flowId) {
+                const statuses = ['Succeeded', 'Failed', 'Running', 'Cancelled'];
+                const history = [];
+                const numRuns = Math.floor(Math.random() * 20) + 5;
+
+                for (let i = 0; i < numRuns; i++) {
+                    const startTime = new Date(Date.now() - (i * 2 * 60 * 60 * 1000));
+                    const endTime = new Date(startTime.getTime() + Math.random() * 300000); // 0-5 minutes duration
+                    
+                    // Higher probability of success for realistic data
+                    let status;
+                    const rand = Math.random();
+                    if (rand < 0.85) status = 'Succeeded';
+                    else if (rand < 0.95) status = 'Failed';
+                    else if (rand < 0.98) status = 'Cancelled';
+                    else status = 'Running';
+
+                    history.push({
+                        runId: `${flowId}-run-${i + 1}`,
+                        status,
+                        startedOn: startTime.toISOString(),
+                        completedOn: status === 'Running' ? null : endTime.toISOString(),
+                        duration: status === 'Running' ? null : Math.floor((endTime - startTime) / 1000),
+                        error: status === 'Failed' ? this.generateRandomError() : null
+                    });
+                }
+
+                return history.sort((a, b) => new Date(b.startedOn) - new Date(a.startedOn));
+            }
+
+            generateRandomError() {
+                const errors = [
+                    'Connection timeout to SharePoint service',
+                    'Microsoft Graph API rate limit exceeded',
+                    'Invalid authentication token',
+                    'Required field validation failed',
+                    'External service temporarily unavailable',
+                    'Insufficient permissions to access resource',
+                    'Data conversion error in connector'
+                ];
+                return errors[Math.floor(Math.random() * errors.length)];
+            }
+
+            calculateFailureRate(runHistory) {
+                if (!runHistory || runHistory.length === 0) return 0;
+                const failedRuns = runHistory.filter(run => run.status === 'Failed').length;
+                return Math.round((failedRuns / runHistory.length) * 100);
+            }
+
+            async makeApiCall(url, options = {}) {
+                const defaultOptions = {
+                    headers: {
+                        'Authorization': `Bearer ${this.accessToken}`,
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    }
+                };
+
+                const response = await fetch(url, { ...defaultOptions, ...options });
+                
+                if (!response.ok) {
+                    const error = await response.text();
+                    throw new Error(`API call failed: ${response.status} ${error}`);
+                }
+
+                return response.json();
+            }
+
+            setConnectedState(connected) {
+                this.isConnected = connected;
+                const connectBtn = document.getElementById('connectBtn');
+                const refreshBtn = document.getElementById('refreshBtn');
+                const exportBtn = document.getElementById('exportBtn');
+                const searchBox = document.getElementById('searchBox');
+                const statusIndicator = document.getElementById('statusIndicator');
+                const connectionStatus = document.getElementById('connectionStatus');
+
+                if (connected) {
+                    connectBtn.textContent = '✅ Connected';
+                    connectBtn.className = 'btn btn-success';
+                    connectBtn.disabled = false;
+                    refreshBtn.disabled = false;
+                    exportBtn.disabled = false;
+                    searchBox.disabled = false;
+                    statusIndicator.classList.add('connected');
+                    connectionStatus.textContent = 'Connected';
+                } else {
+                    connectBtn.textContent = '🔌 Connect to Power Platform';
+                    connectBtn.className = 'btn btn-primary';
+                    connectBtn.disabled = false;
+                    refreshBtn.disabled = true;
+                    exportBtn.disabled = true;
+                    searchBox.disabled = true;
+                    statusIndicator.classList.remove('connected');
+                    connectionStatus.textContent = 'Disconnected';
+                    
+                    if (this.refreshTimer) {
+                        clearInterval(this.refreshTimer);
+                        this.refreshTimer = null;
+                    }
+                }
+            }
+
+            async refreshData() {
+                if (!this.isConnected) {
+                    this.showAlert('Please connect to Power Platform first.', 'warning');
+                    return;
+                }
+
+                try {
+                    await this.fetchFlows();
+                    this.showAlert('Data refreshed successfully!', 'success');
+                } catch (error) {
+                    this.showAlert(`Refresh failed: ${error.message}`, 'error');
+                    console.error('Refresh error:', error);
+                }
+            }
+
+            startAutoRefresh() {
+                if (this.refreshTimer) {
+                    clearInterval(this.refreshTimer);
+                }
+
+                const interval = this.config.refreshInterval * 1000;
+                this.refreshTimer = setInterval(() => {
+                    this.refreshData();
+                }, interval);
+            }
+
+            updateStats() {
+                const stats = this.flows.reduce((acc, flow) => {
+                    acc.total++;
+                    
+                    if (flow.statecode === 1) acc.enabled++;
+                    else acc.suspended++;
+                    
+                    if (flow.runHistory) {
+                        const recentFails = flow.runHistory
                             .slice(
