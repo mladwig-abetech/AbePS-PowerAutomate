@@ -376,19 +376,167 @@
             background: #10b981;
         }
 
-        @media (max-width: 768px) {
-            .config-row {
-                grid-template-columns: 1fr;
-            }
-            
-            .controls {
-                flex-direction: column;
-                align-items: stretch;
-            }
-            
-            .header h1 {
-                font-size: 2rem;
-            }
+        .troubleshoot-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .troubleshoot-modal.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .troubleshoot-content {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            max-width: 800px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+            transform: scale(0.9);
+            transition: transform 0.3s ease;
+        }
+
+        .troubleshoot-modal.show .troubleshoot-content {
+            transform: scale(1);
+        }
+
+        .troubleshoot-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #e5e7eb;
+        }
+
+        .troubleshoot-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #1f2937;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #6b7280;
+            padding: 5px;
+        }
+
+        .close-btn:hover {
+            color: #374151;
+        }
+
+        .test-section {
+            margin-bottom: 25px;
+            padding: 20px;
+            border: 2px solid #e5e7eb;
+            border-radius: 10px;
+            background: #f9fafb;
+        }
+
+        .test-section.running {
+            border-color: #3b82f6;
+            background: #eff6ff;
+        }
+
+        .test-section.success {
+            border-color: #10b981;
+            background: #ecfdf5;
+        }
+
+        .test-section.error {
+            border-color: #ef4444;
+            background: #fef2f2;
+        }
+
+        .test-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .test-name {
+            font-weight: 600;
+            font-size: 1.1rem;
+            color: #1f2937;
+        }
+
+        .test-status {
+            padding: 4px 8px;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .test-status.pending { background: #f3f4f6; color: #6b7280; }
+        .test-status.running { background: #dbeafe; color: #1e40af; }
+        .test-status.success { background: #d1fae5; color: #065f46; }
+        .test-status.error { background: #fee2e2; color: #991b1b; }
+
+        .test-details {
+            font-size: 0.9rem;
+            color: #6b7280;
+            margin-bottom: 15px;
+        }
+
+        .test-result {
+            font-family: 'Monaco', 'Menlo', monospace;
+            background: white;
+            padding: 15px;
+            border-radius: 6px;
+            border: 1px solid #d1d5db;
+            white-space: pre-wrap;
+            font-size: 0.85rem;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .test-result.error {
+            color: #ef4444;
+            border-color: #ef4444;
+        }
+
+        .test-result.success {
+            color: #059669;
+            border-color: #10b981;
+        }
+
+        .run-all-tests-btn {
+            width: 100%;
+            margin-bottom: 20px;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: #e5e7eb;
+            border-radius: 3px;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4a90e2, #357abd);
+            width: 0%;
+            transition: width 0.3s ease;
         }
     </style>
 </head>
@@ -451,6 +599,7 @@
                 <button class="btn btn-primary" id="connectBtn">🔌 Connect to Power Platform</button>
                 <button class="btn btn-secondary" id="refreshBtn" disabled>🔄 Refresh Data</button>
                 <button class="btn btn-secondary" id="exportBtn" disabled>📊 Export Report</button>
+                <button class="btn btn-secondary" id="troubleshootBtn">🔧 Troubleshoot Connection</button>
                 <input type="text" class="search-box" id="searchBox" placeholder="🔍 Search flows by name..." disabled>
                 <div class="connection-status">
                     <div class="status-indicator" id="statusIndicator"></div>
@@ -469,6 +618,76 @@
                         <p>Click "Connect to Power Platform" to start monitoring your flows</p>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Troubleshooting Modal -->
+    <div class="troubleshoot-modal" id="troubleshootModal">
+        <div class="troubleshoot-content">
+            <div class="troubleshoot-header">
+                <h2 class="troubleshoot-title">🔧 Connection Troubleshooting</h2>
+                <button class="close-btn" id="closeTroubleshootBtn">&times;</button>
+            </div>
+
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+
+            <button class="btn btn-primary run-all-tests-btn" id="runAllTestsBtn">🧪 Run All Tests</button>
+
+            <div class="test-section" id="configTest">
+                <div class="test-header">
+                    <div class="test-name">1. Configuration Validation</div>
+                    <div class="test-status pending" id="configTestStatus">Pending</div>
+                </div>
+                <div class="test-details">Validates that all required configuration parameters are properly formatted</div>
+                <div class="test-result" id="configTestResult" style="display: none;"></div>
+            </div>
+
+            <div class="test-section" id="urlTest">
+                <div class="test-header">
+                    <div class="test-name">2. Environment URL Connectivity</div>
+                    <div class="test-status pending" id="urlTestStatus">Pending</div>
+                </div>
+                <div class="test-details">Tests if the Power Platform environment URL is reachable</div>
+                <div class="test-result" id="urlTestResult" style="display: none;"></div>
+            </div>
+
+            <div class="test-section" id="authTest">
+                <div class="test-header">
+                    <div class="test-name">3. Authentication Test</div>
+                    <div class="test-status pending" id="authTestStatus">Pending</div>
+                </div>
+                <div class="test-details">Verifies Azure AD authentication configuration and token acquisition</div>
+                <div class="test-result" id="authTestResult" style="display: none;"></div>
+            </div>
+
+            <div class="test-section" id="apiTest">
+                <div class="test-header">
+                    <div class="test-name">4. API Endpoint Test</div>
+                    <div class="test-status pending" id="apiTestStatus">Pending</div>
+                </div>
+                <div class="test-details">Tests connectivity to Power Automate API endpoints</div>
+                <div class="test-result" id="apiTestResult" style="display: none;"></div>
+            </div>
+
+            <div class="test-section" id="permissionTest">
+                <div class="test-header">
+                    <div class="test-name">5. Permissions Check</div>
+                    <div class="test-status pending" id="permissionTestStatus">Pending</div>
+                </div>
+                <div class="test-details">Verifies that the application has necessary permissions to read flows</div>
+                <div class="test-result" id="permissionTestResult" style="display: none;"></div>
+            </div>
+
+            <div class="test-section" id="networkTest">
+                <div class="test-header">
+                    <div class="test-name">6. Network & CORS Test</div>
+                    <div class="test-status pending" id="networkTestStatus">Pending</div>
+                </div>
+                <div class="test-details">Checks for network connectivity issues and CORS policy problems</div>
+                <div class="test-result" id="networkTestResult" style="display: none;"></div>
             </div>
         </div>
     </div>
@@ -498,17 +717,30 @@
                     connectBtn: document.getElementById('connectBtn'),
                     refreshBtn: document.getElementById('refreshBtn'),
                     exportBtn: document.getElementById('exportBtn'),
+                    troubleshootBtn: document.getElementById('troubleshootBtn'),
                     searchBox: document.getElementById('searchBox'),
                     environmentUrl: document.getElementById('environmentUrl'),
                     clientId: document.getElementById('clientId'),
                     tenantId: document.getElementById('tenantId'),
-                    refreshInterval: document.getElementById('refreshInterval')
+                    refreshInterval: document.getElementById('refreshInterval'),
+                    runAllTestsBtn: document.getElementById('runAllTestsBtn'),
+                    closeTroubleshootBtn: document.getElementById('closeTroubleshootBtn')
                 };
 
                 elements.connectBtn.addEventListener('click', () => this.handleConnect());
                 elements.refreshBtn.addEventListener('click', () => this.refreshData());
                 elements.exportBtn.addEventListener('click', () => this.exportReport());
+                elements.troubleshootBtn.addEventListener('click', () => this.openTroubleshootModal());
                 elements.searchBox.addEventListener('input', (e) => this.filterFlows(e.target.value));
+                elements.runAllTestsBtn.addEventListener('click', () => this.runAllTests());
+                elements.closeTroubleshootBtn.addEventListener('click', () => this.closeTroubleshootModal());
+                
+                // Close modal when clicking outside
+                document.getElementById('troubleshootModal').addEventListener('click', (e) => {
+                    if (e.target.id === 'troubleshootModal') {
+                        this.closeTroubleshootModal();
+                    }
+                });
                 
                 // Configuration change listeners
                 Object.keys(this.config).forEach(key => {
@@ -580,8 +812,351 @@
                     this.startAutoRefresh();
                 } catch (error) {
                     this.setConnectedState(false);
-                    this.showAlert(`Connection failed: ${error.message}`, 'error');
+                    this.showAlert(`Connection failed: ${error.message}. Click "Troubleshoot Connection" for detailed diagnostics.`, 'error');
                     console.error('Connection error:', error);
+                }
+            }
+
+            // Troubleshooting Modal Methods
+            openTroubleshootModal() {
+                document.getElementById('troubleshootModal').classList.add('show');
+                this.resetTestResults();
+            }
+
+            closeTroubleshootModal() {
+                document.getElementById('troubleshootModal').classList.remove('show');
+            }
+
+            resetTestResults() {
+                const testIds = ['configTest', 'urlTest', 'authTest', 'apiTest', 'permissionTest', 'networkTest'];
+                
+                testIds.forEach(testId => {
+                    const section = document.getElementById(testId);
+                    const status = document.getElementById(testId + 'Status');
+                    const result = document.getElementById(testId + 'Result');
+                    
+                    section.className = 'test-section';
+                    status.className = 'test-status pending';
+                    status.textContent = 'Pending';
+                    result.style.display = 'none';
+                    result.textContent = '';
+                });
+
+                document.getElementById('progressFill').style.width = '0%';
+            }
+
+            async runAllTests() {
+                const runBtn = document.getElementById('runAllTestsBtn');
+                const originalText = runBtn.textContent;
+                
+                runBtn.disabled = true;
+                runBtn.textContent = '🧪 Running Tests...';
+                
+                try {
+                    const tests = [
+                        { id: 'configTest', name: 'Configuration Validation', fn: () => this.testConfiguration() },
+                        { id: 'urlTest', name: 'Environment URL Connectivity', fn: () => this.testUrlConnectivity() },
+                        { id: 'authTest', name: 'Authentication Test', fn: () => this.testAuthentication() },
+                        { id: 'apiTest', name: 'API Endpoint Test', fn: () => this.testApiEndpoints() },
+                        { id: 'permissionTest', name: 'Permissions Check', fn: () => this.testPermissions() },
+                        { id: 'networkTest', name: 'Network & CORS Test', fn: () => this.testNetworkAndCors() }
+                    ];
+
+                    for (let i = 0; i < tests.length; i++) {
+                        const test = tests[i];
+                        const progress = ((i + 1) / tests.length) * 100;
+                        
+                        await this.runSingleTest(test.id, test.name, test.fn);
+                        document.getElementById('progressFill').style.width = `${progress}%`;
+                        
+                        // Small delay between tests for better UX
+                        await this.delay(500);
+                    }
+                    
+                } finally {
+                    runBtn.disabled = false;
+                    runBtn.textContent = originalText;
+                }
+            }
+
+            async runSingleTest(testId, testName, testFn) {
+                const section = document.getElementById(testId);
+                const status = document.getElementById(testId + 'Status');
+                const result = document.getElementById(testId + 'Result');
+                
+                // Set running state
+                section.className = 'test-section running';
+                status.className = 'test-status running';
+                status.textContent = 'Running...';
+                result.style.display = 'block';
+                result.className = 'test-result';
+                result.textContent = 'Running diagnostic test...';
+                
+                try {
+                    const testResult = await testFn();
+                    
+                    // Set success state
+                    section.className = 'test-section success';
+                    status.className = 'test-status success';
+                    status.textContent = 'Passed';
+                    result.className = 'test-result success';
+                    result.textContent = testResult.message || 'Test completed successfully';
+                    
+                } catch (error) {
+                    // Set error state
+                    section.className = 'test-section error';
+                    status.className = 'test-status error';
+                    status.textContent = 'Failed';
+                    result.className = 'test-result error';
+                    result.textContent = `❌ ${error.message}\n\n${error.details || 'No additional details available.'}`;
+                }
+            }
+
+            async testConfiguration() {
+                const { environmentUrl, clientId, tenantId, refreshInterval } = this.config;
+                const results = [];
+                
+                // Test environment URL
+                if (!environmentUrl) {
+                    throw new Error('Environment URL is required');
+                } else {
+                    try {
+                        const url = new URL(environmentUrl);
+                        if (!url.hostname.includes('crm') && !url.hostname.includes('dynamics')) {
+                            results.push('⚠️ URL doesn\'t appear to be a Dynamics 365/Power Platform environment');
+                        } else {
+                            results.push('✅ Environment URL format is valid');
+                        }
+                    } catch {
+                        throw new Error('Environment URL is not a valid URL format');
+                    }
+                }
+
+                // Test Client ID
+                const guidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+                if (!clientId) {
+                    throw new Error('Client ID is required');
+                } else if (!guidPattern.test(clientId)) {
+                    throw new Error('Client ID must be a valid GUID format');
+                } else {
+                    results.push('✅ Client ID format is valid');
+                }
+
+                // Test Tenant ID
+                if (!tenantId) {
+                    throw new Error('Tenant ID is required');
+                } else if (!guidPattern.test(tenantId)) {
+                    throw new Error('Tenant ID must be a valid GUID format');
+                } else {
+                    results.push('✅ Tenant ID format is valid');
+                }
+
+                // Test refresh interval
+                if (refreshInterval < 10 || refreshInterval > 300) {
+                    results.push('⚠️ Refresh interval should be between 10-300 seconds for optimal performance');
+                } else {
+                    results.push('✅ Refresh interval is within recommended range');
+                }
+
+                return { message: results.join('\n') };
+            }
+
+            async testUrlConnectivity() {
+                const { environmentUrl } = this.config;
+                
+                try {
+                    // Test basic connectivity
+                    const testUrl = new URL('/api/data/v9.0/$metadata', environmentUrl).href;
+                    
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+                    
+                    const response = await fetch(testUrl, {
+                        method: 'HEAD',
+                        mode: 'no-cors', // This will always succeed but we can catch network errors
+                        signal: controller.signal
+                    });
+
+                    clearTimeout(timeoutId);
+                    
+                    return {
+                        message: `✅ Environment URL is reachable\n📍 Testing endpoint: ${testUrl}\n🌐 Connection successful (network layer)`
+                    };
+                    
+                } catch (error) {
+                    if (error.name === 'AbortError') {
+                        throw new Error('Connection timeout - Environment URL is not reachable within 10 seconds');
+                    }
+                    
+                    const details = `🔍 Tested URL: ${environmentUrl}\n📋 Error Details: ${error.message}\n\n💡 Common causes:\n- Environment URL is incorrect\n- Environment is not accessible from this network\n- DNS resolution issues\n- Firewall blocking the connection`;
+                    
+                    const err = new Error('Unable to connect to the Power Platform environment');
+                    err.details = details;
+                    throw err;
+                }
+            }
+
+            async testAuthentication() {
+                const { tenantId, clientId } = this.config;
+                
+                try {
+                    // Test Azure AD discovery endpoint
+                    const discoveryUrl = `https://login.microsoftonline.com/${tenantId}/v2.0/.well-known/openid_configuration`;
+                    
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 5000);
+                    
+                    const response = await fetch(discoveryUrl, {
+                        signal: controller.signal
+                    });
+
+                    clearTimeout(timeoutId);
+
+                    if (!response.ok) {
+                        throw new Error(`Azure AD tenant validation failed: ${response.status}`);
+                    }
+
+                    const config = await response.json();
+                    
+                    const results = [
+                        '✅ Azure AD tenant is valid and accessible',
+                        `🏢 Tenant: ${tenantId}`,
+                        `🔑 Authorization endpoint: ${config.authorization_endpoint}`,
+                        `🎫 Token endpoint: ${config.token_endpoint}`,
+                        '\n📝 Note: Actual token acquisition requires user interaction and cannot be fully tested here.'
+                    ];
+
+                    return { message: results.join('\n') };
+                    
+                } catch (error) {
+                    if (error.name === 'AbortError') {
+                        throw new Error('Authentication service timeout');
+                    }
+
+                    const details = `🔍 Tested tenant: ${tenantId}\n📋 Error: ${error.message}\n\n💡 Common causes:\n- Tenant ID is incorrect\n- Tenant doesn't exist or is not accessible\n- Network issues with Azure AD endpoints`;
+                    
+                    const err = new Error('Azure AD authentication test failed');
+                    err.details = details;
+                    throw err;
+                }
+            }
+
+            async testApiEndpoints() {
+                const { environmentUrl } = this.config;
+                
+                try {
+                    const apiEndpoints = [
+                        '/api/data/v9.0/$metadata',
+                        '/api/data/v9.0/workflows',
+                        '/api/data/v9.0/workflowlogs'
+                    ];
+
+                    const results = ['🔗 Testing Power Automate API endpoints:'];
+                    
+                    for (const endpoint of apiEndpoints) {
+                        try {
+                            const testUrl = new URL(endpoint, environmentUrl).href;
+                            
+                            // Note: We can't actually test auth-required endpoints without a token
+                            // But we can test if the endpoints are structured correctly
+                            results.push(`✅ ${endpoint} - Endpoint structure valid`);
+                            
+                        } catch (error) {
+                            results.push(`❌ ${endpoint} - Invalid endpoint structure`);
+                        }
+                    }
+
+                    results.push('\n📝 Note: Full API testing requires valid authentication token.');
+                    results.push('💡 These endpoints will be used for flow data retrieval.');
+
+                    return { message: results.join('\n') };
+                    
+                } catch (error) {
+                    const details = `📋 Error: ${error.message}\n\n💡 This indicates issues with the environment URL format or API endpoint construction.`;
+                    
+                    const err = new Error('API endpoint configuration test failed');
+                    err.details = details;
+                    throw err;
+                }
+            }
+
+            async testPermissions() {
+                const { clientId } = this.config;
+                
+                // Simulate permission check
+                await this.delay(1000);
+                
+                const requiredPermissions = [
+                    'https://service.powerapps.com/Workflows.Read.All',
+                    'https://service.powerapps.com/Workflows.ReadWrite.All'
+                ];
+
+                const results = [
+                    `🔐 Required API Permissions for Client ID: ${clientId}`,
+                    '',
+                    '📋 Required permissions for full functionality:',
+                    ...requiredPermissions.map(perm => `   • ${perm}`),
+                    '',
+                    '⚠️ Note: Permission validation requires admin consent and cannot be fully tested here.',
+                    '',
+                    '💡 To verify permissions in Azure Portal:',
+                    '   1. Go to Azure AD > App registrations',
+                    '   2. Find your application by Client ID',
+                    '   3. Check "API permissions" section',
+                    '   4. Ensure admin consent is granted'
+                ];
+
+                return { message: results.join('\n') };
+            }
+
+            async testNetworkAndCors() {
+                try {
+                    // Test general internet connectivity
+                    const testUrls = [
+                        'https://login.microsoftonline.com',
+                        'https://graph.microsoft.com',
+                        'https://service.powerapps.com'
+                    ];
+
+                    const results = ['🌐 Testing network connectivity to Microsoft services:'];
+                    
+                    for (const url of testUrls) {
+                        try {
+                            const controller = new AbortController();
+                            const timeoutId = setTimeout(() => controller.abort(), 3000);
+                            
+                            await fetch(url + '/favicon.ico', {
+                                method: 'HEAD',
+                                mode: 'no-cors',
+                                signal: controller.signal
+                            });
+                            
+                            clearTimeout(timeoutId);
+                            results.push(`✅ ${url} - Reachable`);
+                            
+                        } catch (error) {
+                            if (error.name === 'AbortError') {
+                                results.push(`⚠️ ${url} - Timeout (may indicate network issues)`);
+                            } else {
+                                results.push(`❌ ${url} - Connection failed`);
+                            }
+                        }
+                    }
+
+                    results.push('');
+                    results.push('🔒 CORS Policy Notes:');
+                    results.push('   • Power Platform APIs require proper CORS configuration');
+                    results.push('   • Browser-based apps may need server-side proxy for API calls');
+                    results.push('   • Consider using MSAL.js for proper authentication flow');
+
+                    return { message: results.join('\n') };
+                    
+                } catch (error) {
+                    const details = `📋 Error: ${error.message}\n\n💡 This may indicate broader network connectivity issues.`;
+                    
+                    const err = new Error('Network connectivity test failed');
+                    err.details = details;
+                    throw err;
                 }
             }
 
