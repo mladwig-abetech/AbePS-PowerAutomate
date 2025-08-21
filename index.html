@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -112,12 +111,17 @@
             font-size: 0.9rem;
         }
 
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
         .btn-primary {
             background: linear-gradient(135deg, #4a90e2, #357abd);
             color: white;
         }
 
-        .btn-primary:hover {
+        .btn-primary:hover:not(:disabled) {
             transform: translateY(-2px);
             box-shadow: 0 5px 15px rgba(74, 144, 226, 0.4);
         }
@@ -127,8 +131,13 @@
             color: #374151;
         }
 
-        .btn-secondary:hover {
+        .btn-secondary:hover:not(:disabled) {
             background: #e5e7eb;
+        }
+
+        .btn-success {
+            background: #10b981;
+            color: white;
         }
 
         .search-box {
@@ -157,12 +166,20 @@
             background: #f8fafc;
             padding: 20px 25px;
             border-bottom: 1px solid #e5e7eb;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
         .section-title {
             font-size: 1.3rem;
             font-weight: 600;
             color: #1f2937;
+        }
+
+        .last-updated {
+            font-size: 0.85rem;
+            color: #6b7280;
         }
 
         .flows-list {
@@ -186,7 +203,7 @@
 
         .flow-header {
             display: flex;
-            justify-content: between;
+            justify-content: space-between;
             align-items: flex-start;
             margin-bottom: 12px;
         }
@@ -204,13 +221,16 @@
             border-radius: 20px;
             font-size: 0.8rem;
             font-weight: 500;
-            margin-left: auto;
         }
 
-        .status-running { background: #dbeafe; color: #1e40af; }
-        .status-succeeded { background: #d1fae5; color: #065f46; }
-        .status-failed { background: #fee2e2; color: #991b1b; }
+        .status-enabled { background: #d1fae5; color: #065f46; }
         .status-suspended { background: #fef3c7; color: #92400e; }
+        .status-stopped { background: #fee2e2; color: #991b1b; }
+        
+        .run-status-succeeded { background: #d1fae5; color: #065f46; }
+        .run-status-failed { background: #fee2e2; color: #991b1b; }
+        .run-status-running { background: #dbeafe; color: #1e40af; }
+        .run-status-cancelled { background: #f3f4f6; color: #4b5563; }
 
         .flow-details {
             display: grid;
@@ -235,18 +255,42 @@
             color: #374151;
         }
 
+        .error-message {
+            color: #ef4444;
+            font-size: 0.8rem;
+            margin-top: 5px;
+            font-style: italic;
+        }
+
         .alert-banner {
-            background: linear-gradient(135deg, #fee2e2, #fecaca);
-            border-left: 5px solid #ef4444;
             padding: 15px 20px;
             margin-bottom: 20px;
             border-radius: 8px;
             display: none;
+            border-left: 5px solid;
         }
 
         .alert-banner.show {
             display: block;
             animation: slideDown 0.3s ease;
+        }
+
+        .alert-banner.success {
+            background: linear-gradient(135deg, #d1fae5, #a7f3d0);
+            border-left-color: #10b981;
+            color: #065f46;
+        }
+
+        .alert-banner.error {
+            background: linear-gradient(135deg, #fee2e2, #fecaca);
+            border-left-color: #ef4444;
+            color: #991b1b;
+        }
+
+        .alert-banner.warning {
+            background: linear-gradient(135deg, #fef3c7, #fde68a);
+            border-left-color: #f59e0b;
+            color: #92400e;
         }
 
         @keyframes slideDown {
@@ -313,6 +357,25 @@
             border-color: #4a90e2;
         }
 
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9rem;
+            margin-left: auto;
+        }
+
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #ef4444;
+        }
+
+        .status-indicator.connected {
+            background: #10b981;
+        }
+
         @media (max-width: 768px) {
             .config-row {
                 grid-template-columns: 1fr;
@@ -332,7 +395,7 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>🔄 Power Automate Monitor</h1>
+            <h1>📊 Power Automate Monitor</h1>
             <p>Real-time monitoring and alerting for your Microsoft Power Automate flows</p>
         </div>
 
@@ -346,7 +409,7 @@
                     </div>
                     <div class="form-group">
                         <label class="form-label">Refresh Interval (seconds)</label>
-                        <input type="number" class="form-input" id="refreshInterval" value="30" min="10">
+                        <input type="number" class="form-input" id="refreshInterval" value="30" min="10" max="300">
                     </div>
                 </div>
                 <div class="config-row">
@@ -362,38 +425,43 @@
             </div>
 
             <div class="alert-banner" id="alertBanner">
-                <strong>⚠️ Alert:</strong> <span id="alertMessage"></span>
+                <strong id="alertIcon">ℹ️</strong> <span id="alertMessage"></span>
             </div>
 
             <div class="stats-grid">
                 <div class="stat-card success">
-                    <div class="stat-number" id="successCount">0</div>
-                    <div class="stat-label">Successful Flows</div>
+                    <div class="stat-number" id="enabledCount">-</div>
+                    <div class="stat-label">Enabled Flows</div>
                 </div>
                 <div class="stat-card error">
-                    <div class="stat-number" id="failureCount">0</div>
-                    <div class="stat-label">Failed Flows</div>
-                </div>
-                <div class="stat-card warning">
-                    <div class="stat-number" id="suspendedCount">0</div>
+                    <div class="stat-number" id="suspendedCount">-</div>
                     <div class="stat-label">Suspended Flows</div>
                 </div>
+                <div class="stat-card warning">
+                    <div class="stat-number" id="failedRunsCount">-</div>
+                    <div class="stat-label">Recent Failures</div>
+                </div>
                 <div class="stat-card info">
-                    <div class="stat-number" id="totalFlows">0</div>
+                    <div class="stat-number" id="totalFlows">-</div>
                     <div class="stat-label">Total Flows</div>
                 </div>
             </div>
 
             <div class="controls">
                 <button class="btn btn-primary" id="connectBtn">🔌 Connect to Power Platform</button>
-                <button class="btn btn-secondary" id="refreshBtn">🔄 Refresh Data</button>
-                <button class="btn btn-secondary" id="exportBtn">📊 Export Report</button>
-                <input type="text" class="search-box" id="searchBox" placeholder="🔍 Search flows by name...">
+                <button class="btn btn-secondary" id="refreshBtn" disabled>🔄 Refresh Data</button>
+                <button class="btn btn-secondary" id="exportBtn" disabled>📊 Export Report</button>
+                <input type="text" class="search-box" id="searchBox" placeholder="🔍 Search flows by name..." disabled>
+                <div class="connection-status">
+                    <div class="status-indicator" id="statusIndicator"></div>
+                    <span id="connectionStatus">Disconnected</span>
+                </div>
             </div>
 
             <div class="flows-section">
                 <div class="section-header">
                     <div class="section-title">Flow Status Monitor</div>
+                    <div class="last-updated" id="lastUpdated">Never updated</div>
                 </div>
                 <div class="flows-list" id="flowsList">
                     <div class="loading">
@@ -409,88 +477,351 @@
         class PowerAutomateMonitor {
             constructor() {
                 this.flows = [];
+                this.filteredFlows = [];
                 this.isConnected = false;
                 this.refreshTimer = null;
+                this.accessToken = null;
+                this.environment = null;
+                this.config = {
+                    environmentUrl: '',
+                    clientId: '',
+                    tenantId: '',
+                    refreshInterval: 30
+                };
+                
                 this.initializeEventListeners();
-                this.generateMockData(); // For demonstration
+                this.loadConfiguration();
             }
 
             initializeEventListeners() {
-                document.getElementById('connectBtn').addEventListener('click', () => this.connect());
-                document.getElementById('refreshBtn').addEventListener('click', () => this.refreshData());
-                document.getElementById('exportBtn').addEventListener('click', () => this.exportReport());
-                document.getElementById('searchBox').addEventListener('input', (e) => this.filterFlows(e.target.value));
+                const elements = {
+                    connectBtn: document.getElementById('connectBtn'),
+                    refreshBtn: document.getElementById('refreshBtn'),
+                    exportBtn: document.getElementById('exportBtn'),
+                    searchBox: document.getElementById('searchBox'),
+                    environmentUrl: document.getElementById('environmentUrl'),
+                    clientId: document.getElementById('clientId'),
+                    tenantId: document.getElementById('tenantId'),
+                    refreshInterval: document.getElementById('refreshInterval')
+                };
+
+                elements.connectBtn.addEventListener('click', () => this.handleConnect());
+                elements.refreshBtn.addEventListener('click', () => this.refreshData());
+                elements.exportBtn.addEventListener('click', () => this.exportReport());
+                elements.searchBox.addEventListener('input', (e) => this.filterFlows(e.target.value));
+                
+                // Configuration change listeners
+                Object.keys(this.config).forEach(key => {
+                    const element = elements[key];
+                    if (element) {
+                        element.addEventListener('change', () => this.updateConfiguration());
+                    }
+                });
             }
 
-            generateMockData() {
-                // Generate realistic mock data for demonstration
-                const mockFlows = [
-                    { id: '001', name: 'Daily Sales Report Automation', status: 'Succeeded', lastRun: new Date(Date.now() - 1000 * 60 * 30), duration: '2m 15s', runs: 145, successRate: 98.6 },
-                    { id: '002', name: 'Customer Onboarding Workflow', status: 'Failed', lastRun: new Date(Date.now() - 1000 * 60 * 45), duration: '1m 32s', runs: 89, successRate: 94.4, error: 'Connection timeout to SharePoint' },
-                    { id: '003', name: 'Invoice Processing Pipeline', status: 'Running', lastRun: new Date(Date.now() - 1000 * 60 * 5), duration: '3m 45s', runs: 267, successRate: 99.2 },
-                    { id: '004', name: 'HR Leave Request Handler', status: 'Succeeded', lastRun: new Date(Date.now() - 1000 * 60 * 120), duration: '45s', runs: 56, successRate: 100.0 },
-                    { id: '005', name: 'Email Marketing Campaigns', status: 'Suspended', lastRun: new Date(Date.now() - 1000 * 60 * 180), duration: '4m 12s', runs: 234, successRate: 96.8 },
-                    { id: '006', name: 'Inventory Stock Alerts', status: 'Succeeded', lastRun: new Date(Date.now() - 1000 * 60 * 15), duration: '1m 8s', runs: 445, successRate: 97.3 },
-                    { id: '007', name: 'Teams Meeting Scheduler', status: 'Failed', lastRun: new Date(Date.now() - 1000 * 60 * 60), duration: '2m 30s', runs: 78, successRate: 91.0, error: 'Microsoft Graph API rate limit exceeded' }
-                ];
+            loadConfiguration() {
+                // Load from URL parameters or local configuration
+                const urlParams = new URLSearchParams(window.location.search);
+                
+                Object.keys(this.config).forEach(key => {
+                    const urlValue = urlParams.get(key);
+                    const element = document.getElementById(key);
+                    
+                    if (urlValue && element) {
+                        element.value = urlValue;
+                        this.config[key] = urlValue;
+                    } else if (element) {
+                        this.config[key] = element.value;
+                    }
+                });
+            }
 
-                this.flows = mockFlows;
+            updateConfiguration() {
+                this.config = {
+                    environmentUrl: document.getElementById('environmentUrl').value.trim(),
+                    clientId: document.getElementById('clientId').value.trim(),
+                    tenantId: document.getElementById('tenantId').value.trim(),
+                    refreshInterval: parseInt(document.getElementById('refreshInterval').value) || 30
+                };
+
+                // Restart auto-refresh with new interval if connected
+                if (this.isConnected) {
+                    this.startAutoRefresh();
+                }
+            }
+
+            validateConfiguration() {
+                const { environmentUrl, clientId, tenantId } = this.config;
+                
+                if (!environmentUrl || !clientId || !tenantId) {
+                    throw new Error('Please fill in all required configuration fields');
+                }
+
+                try {
+                    new URL(environmentUrl);
+                } catch {
+                    throw new Error('Invalid environment URL format');
+                }
+
+                // Basic GUID format validation for Azure AD IDs
+                const guidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+                if (!guidPattern.test(clientId) || !guidPattern.test(tenantId)) {
+                    throw new Error('Client ID and Tenant ID must be valid GUIDs');
+                }
+            }
+
+            async handleConnect() {
+                try {
+                    this.validateConfiguration();
+                    await this.authenticate();
+                    await this.fetchFlows();
+                    this.setConnectedState(true);
+                    this.showAlert('Successfully connected to Power Platform! Monitoring active flows.', 'success');
+                    this.startAutoRefresh();
+                } catch (error) {
+                    this.setConnectedState(false);
+                    this.showAlert(`Connection failed: ${error.message}`, 'error');
+                    console.error('Connection error:', error);
+                }
+            }
+
+            async authenticate() {
+                const { clientId, tenantId } = this.config;
+                
+                // Using Microsoft Authentication Library (MSAL) approach
+                // In a real implementation, you would use MSAL.js library
+                const authUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize`;
+                const redirectUri = encodeURIComponent(window.location.origin);
+                const scope = encodeURIComponent('https://service.powerapps.com//.default');
+                
+                // For this demo, we'll simulate the authentication process
+                // In production, implement proper OAuth 2.0 flow with MSAL.js
+                this.showAlert('Authentication would redirect to Microsoft login...', 'warning');
+                
+                // Simulate token for demonstration
+                await this.delay(1000);
+                this.accessToken = 'simulated-access-token';
+            }
+
+            async fetchFlows() {
+                if (!this.accessToken) {
+                    throw new Error('No valid access token available');
+                }
+
+                const { environmentUrl } = this.config;
+                
+                try {
+                    this.showLoading();
+                    
+                    // Construct the API endpoint for Power Automate flows
+                    const apiEndpoint = `${environmentUrl}/api/data/v9.0/workflows`;
+                    const queryParams = new URLSearchParams({
+                        '$select': 'workflowid,name,statecode,statuscode,createdon,modifiedon,category',
+                        '$filter': "category eq 5", // Category 5 = Modern Flow
+                        '$orderby': 'modifiedon desc',
+                        '$top': '100'
+                    });
+
+                    // In a real implementation, make the actual API call
+                    // const response = await this.makeApiCall(`${apiEndpoint}?${queryParams}`);
+                    
+                    // For demonstration, simulate API response
+                    await this.delay(1500);
+                    const simulatedFlows = this.generateRealisticFlowData();
+                    
+                    this.flows = simulatedFlows;
+                    this.filteredFlows = [...this.flows];
+                    this.updateStats();
+                    this.renderFlows();
+                    this.updateLastUpdated();
+                    
+                    // Fetch run history for each flow
+                    await this.fetchFlowRunHistory();
+                    
+                } catch (error) {
+                    throw new Error(`Failed to fetch flows: ${error.message}`);
+                }
+            }
+
+            async fetchFlowRunHistory() {
+                // Fetch recent run history for each flow to determine health status
+                const promises = this.flows.slice(0, 10).map(async (flow) => {
+                    try {
+                        // In production: GET /api/data/v9.0/workflowlogs
+                        await this.delay(200); // Simulate API call
+                        
+                        // Simulate run history data
+                        const runHistory = this.generateFlowRunHistory(flow.workflowid);
+                        flow.runHistory = runHistory;
+                        flow.lastRunStatus = runHistory[0]?.status || 'Unknown';
+                        flow.lastRunTime = runHistory[0]?.completedOn || flow.modifiedon;
+                        flow.failureRate = this.calculateFailureRate(runHistory);
+                        
+                    } catch (error) {
+                        console.warn(`Failed to fetch run history for ${flow.name}:`, error);
+                        flow.lastRunStatus = 'Unknown';
+                        flow.failureRate = 0;
+                    }
+                });
+
+                await Promise.all(promises);
                 this.updateStats();
                 this.renderFlows();
             }
 
-            connect() {
-                const connectBtn = document.getElementById('connectBtn');
-                const originalText = connectBtn.textContent;
-                
-                connectBtn.textContent = '🔄 Connecting...';
-                connectBtn.disabled = true;
+            generateRealisticFlowData() {
+                const flowTemplates = [
+                    { name: 'Daily Sales Report Automation', category: 'Business Process' },
+                    { name: 'Customer Onboarding Workflow', category: 'HR & Onboarding' },
+                    { name: 'Invoice Processing Pipeline', category: 'Finance & Accounting' },
+                    { name: 'Email Marketing Campaign Trigger', category: 'Marketing' },
+                    { name: 'IT Ticket Assignment Handler', category: 'IT Operations' },
+                    { name: 'Contract Approval Workflow', category: 'Legal & Compliance' },
+                    { name: 'Inventory Stock Level Alerts', category: 'Supply Chain' },
+                    { name: 'Employee Leave Request Handler', category: 'HR & Onboarding' },
+                    { name: 'Social Media Content Scheduler', category: 'Marketing' },
+                    { name: 'Data Backup Validation Process', category: 'IT Operations' }
+                ];
 
-                // Simulate connection process
-                setTimeout(() => {
-                    this.isConnected = true;
-                    connectBtn.textContent = '✅ Connected';
-                    connectBtn.className = 'btn btn-secondary';
-                    
-                    this.showAlert('Successfully connected to Power Platform! Monitoring active flows.', 'success');
-                    this.startAutoRefresh();
-                    
-                    setTimeout(() => {
-                        connectBtn.disabled = false;
-                    }, 2000);
-                }, 2000);
+                return flowTemplates.map((template, index) => ({
+                    workflowid: `flow-${String(index + 1).padStart(3, '0')}`,
+                    name: template.name,
+                    category: template.category,
+                    statecode: Math.random() > 0.1 ? 1 : 0, // 90% enabled
+                    statuscode: Math.random() > 0.05 ? 1 : 2, // 95% active
+                    createdon: new Date(Date.now() - Math.random() * 90 * 24 * 60 * 60 * 1000).toISOString(),
+                    modifiedon: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString(),
+                    runHistory: [],
+                    lastRunStatus: 'Unknown',
+                    lastRunTime: null,
+                    failureRate: 0
+                }));
             }
 
-            refreshData() {
+            generateFlowRunHistory(flowId) {
+                const statuses = ['Succeeded', 'Failed', 'Running', 'Cancelled'];
+                const history = [];
+                const numRuns = Math.floor(Math.random() * 20) + 5;
+
+                for (let i = 0; i < numRuns; i++) {
+                    const startTime = new Date(Date.now() - (i * 2 * 60 * 60 * 1000));
+                    const endTime = new Date(startTime.getTime() + Math.random() * 300000); // 0-5 minutes duration
+                    
+                    // Higher probability of success for realistic data
+                    let status;
+                    const rand = Math.random();
+                    if (rand < 0.85) status = 'Succeeded';
+                    else if (rand < 0.95) status = 'Failed';
+                    else if (rand < 0.98) status = 'Cancelled';
+                    else status = 'Running';
+
+                    history.push({
+                        runId: `${flowId}-run-${i + 1}`,
+                        status,
+                        startedOn: startTime.toISOString(),
+                        completedOn: status === 'Running' ? null : endTime.toISOString(),
+                        duration: status === 'Running' ? null : Math.floor((endTime - startTime) / 1000),
+                        error: status === 'Failed' ? this.generateRandomError() : null
+                    });
+                }
+
+                return history.sort((a, b) => new Date(b.startedOn) - new Date(a.startedOn));
+            }
+
+            generateRandomError() {
+                const errors = [
+                    'Connection timeout to SharePoint service',
+                    'Microsoft Graph API rate limit exceeded',
+                    'Invalid authentication token',
+                    'Required field validation failed',
+                    'External service temporarily unavailable',
+                    'Insufficient permissions to access resource',
+                    'Data conversion error in connector'
+                ];
+                return errors[Math.floor(Math.random() * errors.length)];
+            }
+
+            calculateFailureRate(runHistory) {
+                if (!runHistory || runHistory.length === 0) return 0;
+                const failedRuns = runHistory.filter(run => run.status === 'Failed').length;
+                return Math.round((failedRuns / runHistory.length) * 100);
+            }
+
+            async makeApiCall(url, options = {}) {
+                const defaultOptions = {
+                    headers: {
+                        'Authorization': `Bearer ${this.accessToken}`,
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    }
+                };
+
+                const response = await fetch(url, { ...defaultOptions, ...options });
+                
+                if (!response.ok) {
+                    const error = await response.text();
+                    throw new Error(`API call failed: ${response.status} ${error}`);
+                }
+
+                return response.json();
+            }
+
+            setConnectedState(connected) {
+                this.isConnected = connected;
+                const connectBtn = document.getElementById('connectBtn');
+                const refreshBtn = document.getElementById('refreshBtn');
+                const exportBtn = document.getElementById('exportBtn');
+                const searchBox = document.getElementById('searchBox');
+                const statusIndicator = document.getElementById('statusIndicator');
+                const connectionStatus = document.getElementById('connectionStatus');
+
+                if (connected) {
+                    connectBtn.textContent = '✅ Connected';
+                    connectBtn.className = 'btn btn-success';
+                    connectBtn.disabled = false;
+                    refreshBtn.disabled = false;
+                    exportBtn.disabled = false;
+                    searchBox.disabled = false;
+                    statusIndicator.classList.add('connected');
+                    connectionStatus.textContent = 'Connected';
+                } else {
+                    connectBtn.textContent = '🔌 Connect to Power Platform';
+                    connectBtn.className = 'btn btn-primary';
+                    connectBtn.disabled = false;
+                    refreshBtn.disabled = true;
+                    exportBtn.disabled = true;
+                    searchBox.disabled = true;
+                    statusIndicator.classList.remove('connected');
+                    connectionStatus.textContent = 'Disconnected';
+                    
+                    if (this.refreshTimer) {
+                        clearInterval(this.refreshTimer);
+                        this.refreshTimer = null;
+                    }
+                }
+            }
+
+            async refreshData() {
                 if (!this.isConnected) {
                     this.showAlert('Please connect to Power Platform first.', 'warning');
                     return;
                 }
 
-                // Simulate data refresh with some random updates
-                this.flows.forEach(flow => {
-                    if (Math.random() < 0.3) { // 30% chance to update
-                        const statuses = ['Succeeded', 'Failed', 'Running'];
-                        const randomStatus = statuses[Math.floor(Math.random() * statuses.length)];
-                        if (flow.status !== 'Running') {
-                            flow.status = randomStatus;
-                            flow.lastRun = new Date();
-                        }
-                    }
-                });
-
-                this.updateStats();
-                this.renderFlows();
-                this.showAlert('Data refreshed successfully!', 'success');
+                try {
+                    await this.fetchFlows();
+                    this.showAlert('Data refreshed successfully!', 'success');
+                } catch (error) {
+                    this.showAlert(`Refresh failed: ${error.message}`, 'error');
+                    console.error('Refresh error:', error);
+                }
             }
 
             startAutoRefresh() {
-                const interval = parseInt(document.getElementById('refreshInterval').value) * 1000;
-                
                 if (this.refreshTimer) {
                     clearInterval(this.refreshTimer);
                 }
 
+                const interval = this.config.refreshInterval * 1000;
                 this.refreshTimer = setInterval(() => {
                     this.refreshData();
                 }, interval);
@@ -499,128 +830,10 @@
             updateStats() {
                 const stats = this.flows.reduce((acc, flow) => {
                     acc.total++;
-                    switch (flow.status) {
-                        case 'Succeeded': acc.success++; break;
-                        case 'Failed': acc.failure++; break;
-                        case 'Suspended': acc.suspended++; break;
-                    }
-                    return acc;
-                }, { success: 0, failure: 0, suspended: 0, total: 0 });
-
-                document.getElementById('successCount').textContent = stats.success;
-                document.getElementById('failureCount').textContent = stats.failure;
-                document.getElementById('suspendedCount').textContent = stats.suspended;
-                document.getElementById('totalFlows').textContent = stats.total;
-            }
-
-            renderFlows() {
-                const flowsList = document.getElementById('flowsList');
-                
-                if (this.flows.length === 0) {
-                    flowsList.innerHTML = '<div class="loading"><p>No flows found.</p></div>';
-                    return;
-                }
-
-                flowsList.innerHTML = this.flows.map(flow => `
-                    <div class="flow-item">
-                        <div class="flow-header">
-                            <div>
-                                <div class="flow-name">${flow.name}</div>
-                                <span class="flow-status status-${flow.status.toLowerCase()}">${flow.status}</span>
-                            </div>
-                        </div>
-                        <div class="flow-details">
-                            <div class="flow-metric">
-                                <span class="metric-label">Last Run</span>
-                                <span class="metric-value">${this.formatTimeAgo(flow.lastRun)}</span>
-                            </div>
-                            <div class="flow-metric">
-                                <span class="metric-label">Duration</span>
-                                <span class="metric-value">${flow.duration}</span>
-                            </div>
-                            <div class="flow-metric">
-                                <span class="metric-label">Total Runs</span>
-                                <span class="metric-value">${flow.runs}</span>
-                            </div>
-                            <div class="flow-metric">
-                                <span class="metric-label">Success Rate</span>
-                                <span class="metric-value">${flow.successRate}%</span>
-                            </div>
-                            ${flow.error ? `<div class="flow-metric"><span class="metric-label">Error</span><span class="metric-value" style="color: #ef4444;">${flow.error}</span></div>` : ''}
-                        </div>
-                    </div>
-                `).join('');
-            }
-
-            filterFlows(searchTerm) {
-                const filteredFlows = this.flows.filter(flow => 
-                    flow.name.toLowerCase().includes(searchTerm.toLowerCase())
-                );
-                
-                const flowsList = document.getElementById('flowsList');
-                if (filteredFlows.length === 0 && searchTerm) {
-                    flowsList.innerHTML = '<div class="loading"><p>No flows match your search criteria.</p></div>';
-                    return;
-                }
-                
-                // Temporarily store original flows and update with filtered
-                const originalFlows = this.flows;
-                this.flows = filteredFlows;
-                this.renderFlows();
-                this.flows = originalFlows;
-            }
-
-            formatTimeAgo(date) {
-                const seconds = Math.floor((new Date() - date) / 1000);
-                
-                if (seconds < 60) return `${seconds}s ago`;
-                if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-                if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-                return `${Math.floor(seconds / 86400)}d ago`;
-            }
-
-            showAlert(message, type = 'info') {
-                const alertBanner = document.getElementById('alertBanner');
-                const alertMessage = document.getElementById('alertMessage');
-                
-                alertMessage.textContent = message;
-                alertBanner.className = `alert-banner show ${type}`;
-                
-                setTimeout(() => {
-                    alertBanner.classList.remove('show');
-                }, 5000);
-            }
-
-            exportReport() {
-                const report = {
-                    timestamp: new Date().toISOString(),
-                    summary: {
-                        totalFlows: this.flows.length,
-                        succeeded: this.flows.filter(f => f.status === 'Succeeded').length,
-                        failed: this.flows.filter(f => f.status === 'Failed').length,
-                        suspended: this.flows.filter(f => f.status === 'Suspended').length,
-                    },
-                    flows: this.flows
-                };
-
-                const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `power-automate-report-${new Date().toISOString().split('T')[0]}.json`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-                
-                this.showAlert('Report exported successfully!', 'success');
-            }
-        }
-
-        // Initialize the monitor when the page loads
-        document.addEventListener('DOMContentLoaded', () => {
-            new PowerAutomateMonitor();
-        });
-    </script>
-</body>
-</html>
+                    
+                    if (flow.statecode === 1) acc.enabled++;
+                    else acc.suspended++;
+                    
+                    if (flow.runHistory) {
+                        const recentFails = flow.runHistory
+                            .slice(
