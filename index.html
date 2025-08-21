@@ -148,6 +148,123 @@
             padding: 30px;
         }
 
+        /* Diagnostics Panel */
+        .diagnostics-panel {
+            position: fixed;
+            right: 20px;
+            bottom: 20px;
+            width: 400px;
+            max-height: 500px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+            z-index: 1000;
+            transition: all 0.3s ease;
+        }
+
+        .diagnostics-panel.collapsed {
+            height: 50px;
+        }
+
+        .diagnostics-panel.hidden {
+            transform: translateX(420px);
+        }
+
+        .diagnostics-header {
+            background: linear-gradient(135deg, #374151, #1f2937);
+            color: white;
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        .diagnostics-title {
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .diagnostics-controls {
+            display: flex;
+            gap: 10px;
+        }
+
+        .diagnostics-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85rem;
+        }
+
+        .diagnostics-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .diagnostics-content {
+            padding: 15px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+        }
+
+        .diagnostics-panel.collapsed .diagnostics-content {
+            display: none;
+        }
+
+        .log-entry {
+            padding: 8px;
+            margin-bottom: 8px;
+            border-left: 3px solid;
+            background: #f9fafb;
+            border-radius: 4px;
+        }
+
+        .log-entry.info {
+            border-left-color: #3b82f6;
+            background: #eff6ff;
+        }
+
+        .log-entry.success {
+            border-left-color: #10b981;
+            background: #f0fdf4;
+        }
+
+        .log-entry.warning {
+            border-left-color: #f59e0b;
+            background: #fffbeb;
+        }
+
+        .log-entry.error {
+            border-left-color: #ef4444;
+            background: #fef2f2;
+        }
+
+        .log-time {
+            color: #6b7280;
+            font-size: 0.75rem;
+        }
+
+        .log-message {
+            margin-top: 4px;
+            word-break: break-word;
+        }
+
+        .log-details {
+            margin-top: 8px;
+            padding: 8px;
+            background: rgba(0, 0, 0, 0.05);
+            border-radius: 4px;
+            font-size: 0.8rem;
+        }
+
         /* Settings Page Styles */
         .settings-container {
             max-width: 900px;
@@ -680,6 +797,12 @@
                 margin-top: 20px;
                 justify-content: center;
             }
+
+            .diagnostics-panel {
+                width: calc(100% - 40px);
+                right: 20px;
+                left: 20px;
+            }
         }
     </style>
 </head>
@@ -734,6 +857,7 @@
                     <button class="btn btn-primary" id="connectBtn">🔌 Connect to Power Platform</button>
                     <button class="btn btn-secondary" id="refreshBtn" disabled>🔄 Refresh Data</button>
                     <button class="btn btn-secondary" id="exportBtn" disabled>📊 Export Report</button>
+                    <button class="btn btn-secondary" id="toggleDemoBtn">🎭 Toggle Demo Mode</button>
                     <input type="text" class="search-box" id="searchBox" placeholder="🔍 Search flows by name..." disabled>
                     <div class="connection-status">
                         <div class="status-indicator" id="statusIndicator"></div>
@@ -799,724 +923,10 @@
                             <div class="form-row">
                                 <div class="form-group">
                                     <label class="form-label">
-                                        Environment URL <span class="required">*</span>
+                                        Environment ID <span class="required">*</span>
                                     </label>
-                                    <input type="url" class="form-input" id="connEnvUrl" placeholder="https://yourtenant.crm.dynamics.com/" required>
+                                    <input type="text" class="form-input" id="connEnvId" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" required>
+                                    <span class="form-helper">Power Platform Environment ID</span>
                                 </div>
                                 <div class="form-group">
-                                    <label class="form-label">
-                                        Refresh Interval (seconds)
-                                    </label>
-                                    <input type="number" class="form-input" id="connRefreshInterval" value="30" min="10" max="300">
-                                </div>
-                            </div>
-
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label class="form-label">
-                                        Client ID <span class="required">*</span>
-                                    </label>
-                                    <input type="text" class="form-input" id="connClientId" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" required>
-                                    <span class="form-helper">Azure AD App Registration Client ID</span>
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">
-                                        Tenant ID <span class="required">*</span>
-                                    </label>
-                                    <input type="text" class="form-input" id="connTenantId" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" required>
-                                    <span class="form-helper">Azure AD Tenant ID</span>
-                                </div>
-                            </div>
-
-                            <div class="form-group full-width">
-                                <label class="form-label">
-                                    Client Secret (Optional)
-                                </label>
-                                <input type="password" class="form-input" id="connClientSecret" placeholder="Enter if using app-only authentication">
-                                <span class="form-helper">Required only for app-only authentication scenarios</span>
-                            </div>
-
-                            <div class="form-actions">
-                                <button type="button" class="btn btn-secondary" onclick="clearConnectionForm()">Clear</button>
-                                <button type="submit" class="btn btn-primary">Save Connection</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        // MSAL Configuration
-        // IMPORTANT: Update these values with your Azure AD app registration details
-        const msalConfig = {
-            auth: {
-                clientId: 'c05c6850-bae6-4dfb-a6ea-c408868014a1', // Your Azure AD app client ID
-                authority: 'https://login.microsoftonline.com/30b2cab5-4b41-42ba-9ae3-af22c87241d9', // Replace YOUR_TENANT_ID with your actual tenant ID
-                redirectUri: window.location.origin // Or specify your app URL explicitly
-            },
-            cache: {
-                cacheLocation: 'sessionStorage',
-                storeAuthStateInCookie: false
-            }
-        };
-
-        const loginRequest = {
-            scopes: ['User.Read', 'openid', 'profile', 'email']
-        };
-
-        // Initialize MSAL
-        let msalInstance = null;
-        
-        class AuthManager {
-            constructor() {
-                this.isAuthenticated = false;
-                this.currentUser = null;
-                
-                // Check if we have a valid configuration
-                if (!msalConfig.auth.authority.includes('YOUR_TENANT_ID')) {
-                    try {
-                        msalInstance = new msal.PublicClientApplication(msalConfig);
-                        this.handleRedirect();
-                    } catch (error) {
-                        console.error('MSAL initialization error:', error);
-                        console.log('Please configure your tenant ID in msalConfig.auth.authority');
-                    }
-                } else {
-                    console.warn('MSAL not configured. Please update the tenant ID in the configuration.');
-                    console.warn('Replace YOUR_TENANT_ID in authority URL with your actual Azure AD tenant ID');
-                    console.warn('You can find your tenant ID in Azure Portal > Azure Active Directory > Overview');
-                }
-            }
-
-            async handleRedirect() {
-                try {
-                    const response = await msalInstance.handleRedirectPromise();
-                    if (response) {
-                        this.handleAuthResponse(response);
-                    } else {
-                        // Check if user is already signed in
-                        const accounts = msalInstance.getAllAccounts();
-                        if (accounts.length > 0) {
-                            this.currentUser = accounts[0];
-                            this.isAuthenticated = true;
-                            this.updateUI();
-                        }
-                    }
-                } catch (error) {
-                    console.error('Authentication error:', error);
-                }
-            }
-
-            async signIn() {
-                if (!msalInstance) {
-                    // For demo purposes, simulate authentication
-                    this.simulateSignIn();
-                    return;
-                }
-
-                try {
-                    const response = await msalInstance.loginPopup(loginRequest);
-                    this.handleAuthResponse(response);
-                } catch (error) {
-                    console.error('Sign in error:', error);
-                    showAlert('Authentication failed. Please try again.', 'error');
-                }
-            }
-
-            handleAuthResponse(response) {
-                this.currentUser = response.account;
-                this.isAuthenticated = true;
-                this.updateUI();
-                showAlert(`Welcome, ${this.currentUser.name}!`, 'success');
-            }
-
-            signOut() {
-                if (!msalInstance) {
-                    // For demo purposes
-                    this.isAuthenticated = false;
-                    this.currentUser = null;
-                    this.updateUI();
-                    showAlert('Signed out successfully', 'success');
-                    return;
-                }
-
-                const logoutRequest = {
-                    account: msalInstance.getAccountByUsername(this.currentUser.username)
-                };
-
-                msalInstance.logoutPopup(logoutRequest).then(() => {
-                    this.isAuthenticated = false;
-                    this.currentUser = null;
-                    this.updateUI();
-                });
-            }
-
-            // Demo mode - simulate authentication for testing
-            simulateSignIn() {
-                this.isAuthenticated = true;
-                this.currentUser = {
-                    name: 'Demo User',
-                    username: 'demo@contoso.com',
-                    localAccountId: 'demo-user-id'
-                };
-                this.updateUI();
-                showAlert('Signed in with demo account. Configure MSAL for production use.', 'warning');
-            }
-
-            updateUI() {
-                const userInfo = document.getElementById('userInfo');
-                const authRequired = document.getElementById('authRequired');
-                const settingsContent = document.getElementById('settingsContent');
-                const userName = document.getElementById('userName');
-                const userAvatar = document.getElementById('userAvatar');
-
-                if (this.isAuthenticated && this.currentUser) {
-                    userInfo.style.display = 'flex';
-                    userName.textContent = this.currentUser.name || this.currentUser.username;
-                    userAvatar.textContent = (this.currentUser.name || 'U')[0].toUpperCase();
-                    
-                    // Show settings content if on settings tab
-                    if (document.getElementById('settingsTab').classList.contains('active')) {
-                        authRequired.style.display = 'none';
-                        settingsContent.style.display = 'block';
-                        loadSavedConnections();
-                    }
-                } else {
-                    userInfo.style.display = 'none';
-                    if (document.getElementById('settingsTab').classList.contains('active')) {
-                        authRequired.style.display = 'flex';
-                        settingsContent.style.display = 'none';
-                    }
-                }
-            }
-        }
-
-        // Initialize Auth Manager
-        const authManager = new AuthManager();
-
-        // Tab switching
-        function switchTab(tabName) {
-            console.log('Switching to tab:', tabName);
-            
-            // Update tab buttons
-            document.querySelectorAll('.nav-tab').forEach(tab => {
-                tab.classList.remove('active');
-            });
-            event.target.classList.add('active');
-
-            // Update tab content
-            document.querySelectorAll('.tab-content').forEach(content => {
-                content.classList.remove('active');
-            });
-
-            if (tabName === 'monitor') {
-                document.getElementById('monitorTab').classList.add('active');
-            } else if (tabName === 'settings') {
-                document.getElementById('settingsTab').classList.add('active');
-                
-                // Check authentication when switching to settings
-                if (!authManager.isAuthenticated) {
-                    document.getElementById('authRequired').style.display = 'flex';
-                    document.getElementById('settingsContent').style.display = 'none';
-                } else {
-                    document.getElementById('authRequired').style.display = 'none';
-                    document.getElementById('settingsContent').style.display = 'block';
-                    loadSavedConnections();
-                }
-            }
-        }
-
-        // Connection Management
-        class ConnectionManager {
-            constructor() {
-                this.connections = this.loadFromStorage();
-                this.activeConnection = null;
-            }
-
-            loadFromStorage() {
-                const stored = localStorage.getItem('powerAutomateConnections');
-                return stored ? JSON.parse(stored) : [];
-            }
-
-            saveToStorage() {
-                localStorage.setItem('powerAutomateConnections', JSON.stringify(this.connections));
-            }
-
-            addConnection(connection) {
-                connection.id = Date.now().toString();
-                connection.createdAt = new Date().toISOString();
-                connection.createdBy = authManager.currentUser?.username || 'Unknown';
-                this.connections.push(connection);
-                this.saveToStorage();
-                return connection;
-            }
-
-            updateConnection(id, updates) {
-                const index = this.connections.findIndex(c => c.id === id);
-                if (index !== -1) {
-                    this.connections[index] = { ...this.connections[index], ...updates };
-                    this.saveToStorage();
-                    return this.connections[index];
-                }
-                return null;
-            }
-
-            deleteConnection(id) {
-                this.connections = this.connections.filter(c => c.id !== id);
-                this.saveToStorage();
-                if (this.activeConnection?.id === id) {
-                    this.activeConnection = null;
-                }
-            }
-
-            getConnection(id) {
-                return this.connections.find(c => c.id === id);
-            }
-
-            setActiveConnection(id) {
-                this.activeConnection = this.getConnection(id);
-                return this.activeConnection;
-            }
-        }
-
-        const connectionManager = new ConnectionManager();
-
-        // Load saved connections
-        function loadSavedConnections() {
-            const container = document.getElementById('savedConnections');
-            const connections = connectionManager.connections;
-
-            if (connections.length === 0) {
-                container.innerHTML = '<p style="text-align: center; color: #6b7280;">No saved connections yet. Add your first connection below.</p>';
-                return;
-            }
-
-            container.innerHTML = connections.map(conn => `
-                <div class="connection-card" data-id="${conn.id}">
-                    <div class="connection-info">
-                        <div class="connection-name">${conn.name}</div>
-                        <div class="connection-details">
-                            ${conn.environmentUrl} • Created ${new Date(conn.createdAt).toLocaleDateString()}
-                        </div>
-                    </div>
-                    <div class="connection-actions">
-                        <button class="action-btn use" onclick="useConnection('${conn.id}')">Use</button>
-                        <button class="action-btn edit" onclick="editConnection('${conn.id}')">Edit</button>
-                        <button class="action-btn delete" onclick="deleteConnection('${conn.id}')">Delete</button>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        // Connection form handling
-        document.getElementById('connectionForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            const connection = {
-                name: document.getElementById('connName').value,
-                environmentUrl: document.getElementById('connEnvUrl').value,
-                refreshInterval: parseInt(document.getElementById('connRefreshInterval').value),
-                clientId: document.getElementById('connClientId').value,
-                tenantId: document.getElementById('connTenantId').value,
-                clientSecret: document.getElementById('connClientSecret').value
-            };
-
-            // Validate GUIDs
-            const guidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-            if (!guidPattern.test(connection.clientId)) {
-                showAlert('Client ID must be a valid GUID', 'error');
-                return;
-            }
-            if (!guidPattern.test(connection.tenantId)) {
-                showAlert('Tenant ID must be a valid GUID', 'error');
-                return;
-            }
-
-            connectionManager.addConnection(connection);
-            loadSavedConnections();
-            clearConnectionForm();
-            showAlert('Connection saved successfully!', 'success');
-        });
-
-        function clearConnectionForm() {
-            document.getElementById('connectionForm').reset();
-        }
-
-        function useConnection(id) {
-            const connection = connectionManager.setActiveConnection(id);
-            if (connection) {
-                // Switch to monitor tab
-                document.querySelector('.nav-tab').click();
-                
-                // Apply connection settings
-                monitor.config = {
-                    environmentUrl: connection.environmentUrl,
-                    clientId: connection.clientId,
-                    tenantId: connection.tenantId,
-                    refreshInterval: connection.refreshInterval
-                };
-                
-                showAlert(`Using connection: ${connection.name}`, 'success');
-                
-                // Auto-connect
-                setTimeout(() => {
-                    monitor.handleConnect();
-                }, 500);
-            }
-        }
-
-        function editConnection(id) {
-            const connection = connectionManager.getConnection(id);
-            if (connection) {
-                document.getElementById('connName').value = connection.name;
-                document.getElementById('connEnvUrl').value = connection.environmentUrl;
-                document.getElementById('connRefreshInterval').value = connection.refreshInterval;
-                document.getElementById('connClientId').value = connection.clientId;
-                document.getElementById('connTenantId').value = connection.tenantId;
-                document.getElementById('connClientSecret').value = connection.clientSecret || '';
-                
-                // Delete the old one (will save as new)
-                connectionManager.deleteConnection(id);
-                loadSavedConnections();
-                
-                // Scroll to form
-                document.getElementById('connectionForm').scrollIntoView({ behavior: 'smooth' });
-            }
-        }
-
-        function deleteConnection(id) {
-            if (confirm('Are you sure you want to delete this connection?')) {
-                connectionManager.deleteConnection(id);
-                loadSavedConnections();
-                showAlert('Connection deleted', 'success');
-            }
-        }
-
-        // Power Automate Monitor Class
-        class PowerAutomateMonitor {
-            constructor() {
-                this.flows = [];
-                this.filteredFlows = [];
-                this.isConnected = false;
-                this.refreshTimer = null;
-                this.accessToken = null;
-                this.config = {
-                    environmentUrl: '',
-                    clientId: '',
-                    tenantId: '',
-                    refreshInterval: 30
-                };
-                
-                console.log('PowerAutomateMonitor initialized');
-                this.initializeEventListeners();
-            }
-
-            initializeEventListeners() {
-                console.log('Setting up event listeners...');
-                
-                // Connect button
-                document.getElementById('connectBtn').addEventListener('click', () => this.handleConnect());
-
-                // Refresh button
-                document.getElementById('refreshBtn').addEventListener('click', () => this.refreshData());
-
-                // Export button
-                document.getElementById('exportBtn').addEventListener('click', () => this.exportReport());
-
-                // Search box
-                document.getElementById('searchBox').addEventListener('input', (e) => this.filterFlows(e.target.value));
-
-                console.log('Event listeners initialized');
-            }
-
-            async handleConnect() {
-                console.log('Connect button clicked');
-                
-                if (this.isConnected) {
-                    // Disconnect
-                    this.setConnectedState(false);
-                    showAlert('Disconnected from Power Platform', 'success');
-                    return;
-                }
-
-                // Check if we have an active connection from settings
-                if (connectionManager.activeConnection) {
-                    this.config = {
-                        environmentUrl: connectionManager.activeConnection.environmentUrl,
-                        clientId: connectionManager.activeConnection.clientId,
-                        tenantId: connectionManager.activeConnection.tenantId,
-                        refreshInterval: connectionManager.activeConnection.refreshInterval
-                    };
-                }
-
-                try {
-                    this.validateConfiguration();
-                    showAlert('Connecting to Power Platform...', 'warning');
-                    await this.authenticate();
-                    await this.fetchFlows();
-                    this.setConnectedState(true);
-                    showAlert('Successfully connected! Monitoring active flows.', 'success');
-                    this.startAutoRefresh();
-                } catch (error) {
-                    console.error('Connection error:', error);
-                    this.setConnectedState(false);
-                    showAlert(`Connection failed: ${error.message}. Please configure a connection in Settings.`, 'error');
-                }
-            }
-
-            validateConfiguration() {
-                const { environmentUrl, clientId, tenantId } = this.config;
-                
-                if (!environmentUrl || !clientId || !tenantId) {
-                    throw new Error('No connection configured. Please add a connection in Settings');
-                }
-
-                try {
-                    new URL(environmentUrl);
-                } catch {
-                    throw new Error('Invalid environment URL format');
-                }
-            }
-
-            async authenticate() {
-                console.log('Authenticating...');
-                // Simulated authentication
-                return new Promise((resolve, reject) => {
-                    setTimeout(() => {
-                        if (this.config.clientId && this.config.tenantId) {
-                            this.accessToken = 'simulated-access-token';
-                            console.log('Authentication successful');
-                            resolve();
-                        } else {
-                            reject(new Error('Invalid credentials'));
-                        }
-                    }, 1000);
-                });
-            }
-
-            async fetchFlows() {
-                console.log('Fetching flows...');
-                return new Promise((resolve) => {
-                    setTimeout(() => {
-                        this.flows = this.generateMockFlows();
-                        this.filteredFlows = [...this.flows];
-                        this.updateStats();
-                        this.renderFlows();
-                        resolve();
-                    }, 500);
-                });
-            }
-
-            generateMockFlows() {
-                const flowNames = [
-                    'Invoice Processing Automation',
-                    'Customer Onboarding Workflow',
-                    'Email Notification System',
-                    'Data Sync - CRM to SharePoint',
-                    'Monthly Report Generator',
-                    'Approval Request Handler',
-                    'File Backup Automation',
-                    'Lead Scoring Calculator',
-                    'Contract Renewal Reminder',
-                    'Expense Report Approval'
-                ];
-
-                const statuses = ['Enabled', 'Suspended', 'Stopped'];
-                const runStatuses = ['Succeeded', 'Failed', 'Running', 'Cancelled'];
-
-                return flowNames.map((name, index) => ({
-                    id: `flow-${index + 1}`,
-                    name: name,
-                    status: statuses[Math.floor(Math.random() * statuses.length)],
-                    lastRun: new Date(Date.now() - Math.random() * 86400000).toISOString(),
-                    lastRunStatus: runStatuses[Math.floor(Math.random() * runStatuses.length)],
-                    successRate: Math.floor(Math.random() * 40 + 60),
-                    totalRuns: Math.floor(Math.random() * 1000),
-                    failedRuns: Math.floor(Math.random() * 50),
-                    avgDuration: Math.floor(Math.random() * 300) + 10
-                }));
-            }
-
-            updateStats() {
-                const enabled = this.flows.filter(f => f.status === 'Enabled').length;
-                const suspended = this.flows.filter(f => f.status === 'Suspended').length;
-                const failed = this.flows.filter(f => f.lastRunStatus === 'Failed').length;
-                
-                document.getElementById('enabledCount').textContent = enabled;
-                document.getElementById('suspendedCount').textContent = suspended;
-                document.getElementById('failedRunsCount').textContent = failed;
-                document.getElementById('totalFlows').textContent = this.flows.length;
-                
-                const now = new Date().toLocaleTimeString();
-                document.getElementById('lastUpdated').textContent = `Last updated: ${now}`;
-            }
-
-            renderFlows() {
-                const flowsList = document.getElementById('flowsList');
-                
-                if (this.filteredFlows.length === 0) {
-                    flowsList.innerHTML = '<div class="loading"><p>No flows found</p></div>';
-                    return;
-                }
-
-                flowsList.innerHTML = this.filteredFlows.map(flow => `
-                    <div class="flow-item">
-                        <div class="flow-header">
-                            <div>
-                                <div class="flow-name">${flow.name}</div>
-                                <span class="flow-status status-${flow.status.toLowerCase()}">${flow.status}</span>
-                            </div>
-                            <div>
-                                <span class="flow-status run-status-${flow.lastRunStatus.toLowerCase()}">
-                                    ${flow.lastRunStatus}
-                                </span>
-                            </div>
-                        </div>
-                        <div class="flow-details">
-                            <div class="flow-metric">
-                                <span class="metric-label">Last Run</span>
-                                <span class="metric-value">${new Date(flow.lastRun).toLocaleString()}</span>
-                            </div>
-                            <div class="flow-metric">
-                                <span class="metric-label">Success Rate</span>
-                                <span class="metric-value">${flow.successRate}%</span>
-                            </div>
-                            <div class="flow-metric">
-                                <span class="metric-label">Total Runs</span>
-                                <span class="metric-value">${flow.totalRuns}</span>
-                            </div>
-                            <div class="flow-metric">
-                                <span class="metric-label">Avg Duration</span>
-                                <span class="metric-value">${flow.avgDuration}s</span>
-                            </div>
-                        </div>
-                    </div>
-                `).join('');
-            }
-
-            filterFlows(searchTerm) {
-                if (!searchTerm) {
-                    this.filteredFlows = [...this.flows];
-                } else {
-                    this.filteredFlows = this.flows.filter(flow => 
-                        flow.name.toLowerCase().includes(searchTerm.toLowerCase())
-                    );
-                }
-                this.renderFlows();
-            }
-
-            refreshData() {
-                console.log('Refreshing data...');
-                showAlert('Refreshing flow data...', 'warning');
-                this.fetchFlows().then(() => {
-                    showAlert('Data refreshed successfully!', 'success');
-                });
-            }
-
-            exportReport() {
-                const report = {
-                    timestamp: new Date().toISOString(),
-                    environment: this.config.environmentUrl,
-                    summary: {
-                        total: this.flows.length,
-                        enabled: this.flows.filter(f => f.status === 'Enabled').length,
-                        suspended: this.flows.filter(f => f.status === 'Suspended').length,
-                        failed: this.flows.filter(f => f.lastRunStatus === 'Failed').length
-                    },
-                    flows: this.flows
-                };
-
-                const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `power-automate-report-${Date.now()}.json`;
-                a.click();
-                URL.revokeObjectURL(url);
-                
-                showAlert('Report exported successfully!', 'success');
-            }
-
-            setConnectedState(connected) {
-                this.isConnected = connected;
-                const indicator = document.getElementById('statusIndicator');
-                const status = document.getElementById('connectionStatus');
-                const refreshBtn = document.getElementById('refreshBtn');
-                const exportBtn = document.getElementById('exportBtn');
-                const searchBox = document.getElementById('searchBox');
-                const connectBtn = document.getElementById('connectBtn');
-
-                if (connected) {
-                    indicator.classList.add('connected');
-                    status.textContent = 'Connected';
-                    refreshBtn.disabled = false;
-                    exportBtn.disabled = false;
-                    searchBox.disabled = false;
-                    connectBtn.textContent = '🔌 Disconnect';
-                } else {
-                    indicator.classList.remove('connected');
-                    status.textContent = 'Disconnected';
-                    refreshBtn.disabled = true;
-                    exportBtn.disabled = true;
-                    searchBox.disabled = true;
-                    connectBtn.textContent = '🔌 Connect to Power Platform';
-                    this.stopAutoRefresh();
-                }
-            }
-
-            startAutoRefresh() {
-                this.stopAutoRefresh();
-                const interval = this.config.refreshInterval * 1000;
-                console.log(`Starting auto-refresh every ${this.config.refreshInterval} seconds`);
-                this.refreshTimer = setInterval(() => {
-                    this.refreshData();
-                }, interval);
-            }
-
-            stopAutoRefresh() {
-                if (this.refreshTimer) {
-                    clearInterval(this.refreshTimer);
-                    this.refreshTimer = null;
-                }
-            }
-        }
-
-        // Alert helper
-        function showAlert(message, type = 'info') {
-            const banner = document.getElementById('alertBanner');
-            const alertMessage = document.getElementById('alertMessage');
-            const alertIcon = document.getElementById('alertIcon');
-
-            alertMessage.textContent = message;
-            banner.className = `alert-banner show ${type}`;
-            
-            const icons = {
-                success: '✅',
-                error: '❌',
-                warning: '⚠️',
-                info: 'ℹ️'
-            };
-            alertIcon.textContent = icons[type] || icons.info;
-
-            setTimeout(() => {
-                banner.classList.remove('show');
-            }, 5000);
-        }
-
-        // Initialize monitor
-        const monitor = new PowerAutomateMonitor();
-
-        // Initialize on page load
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('Application initialized');
-            
-            // Check if there's a default connection
-            if (connectionManager.connections.length > 0 && !connectionManager.activeConnection) {
-                connectionManager.setActiveConnection(connectionManager.connections[0].id);
-            }
-        });
-    </script>
-</body>
-</html>
+                                    <label class
