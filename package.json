@@ -1,0 +1,17 @@
+{
+  "name": "power-automate-monitor",
+  "version": "1.0.0",
+  "description": "Power Automate Flow Monitor - Real-time monitoring and alerting",
+  "main": "index.html",
+  "scripts": {
+    "start": "npx serve .",
+    "build": "echo 'No build required for static HTML'"
+  },
+  "keywords": [
+    "power-automate",
+    "monitoring",
+    "microsoft"
+  ],
+  "author": "",
+  "license": "MIT"
+}
