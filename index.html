@@ -849,11 +849,12 @@
 
     <script>
         // MSAL Configuration
+        // IMPORTANT: Update these values with your Azure AD app registration details
         const msalConfig = {
             auth: {
-                clientId: 'c05c6850-bae6-4dfb-a6ea-c408868014a1', // Replace with your Azure AD app client ID
-                authority: 'https://login.microsoftonline.com/common',
-                redirectUri: window.location.origin
+                clientId: 'c05c6850-bae6-4dfb-a6ea-c408868014a1', // Your Azure AD app client ID
+                authority: 'https://login.microsoftonline.com/YOUR_TENANT_ID', // Replace YOUR_TENANT_ID with your actual tenant ID
+                redirectUri: window.location.origin // Or specify your app URL explicitly
             },
             cache: {
                 cacheLocation: 'sessionStorage',
@@ -873,10 +874,19 @@
                 this.isAuthenticated = false;
                 this.currentUser = null;
                 
-                // Initialize MSAL if client ID is configured
-                if (msalConfig.auth.clientId !== 'YOUR_CLIENT_ID') {
-                    msalInstance = new msal.PublicClientApplication(msalConfig);
-                    this.handleRedirect();
+                // Check if we have a valid configuration
+                if (!msalConfig.auth.authority.includes('YOUR_TENANT_ID')) {
+                    try {
+                        msalInstance = new msal.PublicClientApplication(msalConfig);
+                        this.handleRedirect();
+                    } catch (error) {
+                        console.error('MSAL initialization error:', error);
+                        console.log('Please configure your tenant ID in msalConfig.auth.authority');
+                    }
+                } else {
+                    console.warn('MSAL not configured. Please update the tenant ID in the configuration.');
+                    console.warn('Replace YOUR_TENANT_ID in authority URL with your actual Azure AD tenant ID');
+                    console.warn('You can find your tenant ID in Azure Portal > Azure Active Directory > Overview');
                 }
             }
 
