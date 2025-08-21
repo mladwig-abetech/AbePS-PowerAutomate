@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Power Automate Flow Monitor</title>
+    <title>Power Automate Flow Monitor - Multi-Tenant</title>
     
     <!-- MSAL.js for Azure AD Authentication -->
     <script src="https://alcdn.msauth.net/browser/2.32.2/js/msal-browser.min.js"></script>
@@ -49,6 +49,17 @@
         .header p {
             opacity: 0.9;
             font-size: 1.1rem;
+        }
+
+        .tenant-badge {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            backdrop-filter: blur(10px);
         }
 
         .user-info {
@@ -146,6 +157,103 @@
 
         .main-content {
             padding: 30px;
+        }
+
+        /* Multi-Tenant Auth Modal */
+        .auth-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .auth-modal.show {
+            display: flex;
+        }
+
+        .auth-modal-content {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .auth-modal-header {
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .auth-modal-header h2 {
+            font-size: 1.8rem;
+            color: #1f2937;
+            margin-bottom: 10px;
+        }
+
+        .auth-modal-header p {
+            color: #6b7280;
+        }
+
+        .auth-option {
+            padding: 20px;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .auth-option:hover {
+            border-color: #4a90e2;
+            background: #f0f9ff;
+        }
+
+        .auth-option.selected {
+            border-color: #4a90e2;
+            background: #eff6ff;
+        }
+
+        .auth-option-title {
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .auth-option-desc {
+            font-size: 0.9rem;
+            color: #6b7280;
+        }
+
+        .tenant-input-group {
+            margin-top: 20px;
+            display: none;
+        }
+
+        .tenant-input-group.show {
+            display: block;
         }
 
         /* Diagnostics Panel */
@@ -301,6 +409,48 @@
             border-bottom: 2px solid #e5e7eb;
         }
 
+        .auth-mode-selector {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .auth-mode-card {
+            padding: 15px;
+            border: 2px solid #e5e7eb;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+
+        .auth-mode-card:hover {
+            border-color: #4a90e2;
+            background: #f0f9ff;
+        }
+
+        .auth-mode-card.active {
+            border-color: #4a90e2;
+            background: #eff6ff;
+        }
+
+        .auth-mode-icon {
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+
+        .auth-mode-title {
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 5px;
+        }
+
+        .auth-mode-desc {
+            font-size: 0.85rem;
+            color: #6b7280;
+        }
+
         .saved-connections {
             display: grid;
             gap: 15px;
@@ -336,6 +486,16 @@
         .connection-details {
             font-size: 0.85rem;
             color: #6b7280;
+        }
+
+        .connection-tenant {
+            display: inline-block;
+            padding: 2px 8px;
+            background: #e0e7ff;
+            color: #3730a3;
+            border-radius: 10px;
+            font-size: 0.75rem;
+            margin-left: 8px;
         }
 
         .connection-actions {
@@ -480,59 +640,6 @@
         .btn-danger {
             background: #ef4444;
             color: white;
-        }
-
-        /* Auth Screen */
-        .auth-container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 400px;
-            padding: 40px;
-            text-align: center;
-        }
-
-        .auth-container h2 {
-            font-size: 2rem;
-            color: #1f2937;
-            margin-bottom: 15px;
-        }
-
-        .auth-container p {
-            color: #6b7280;
-            margin-bottom: 30px;
-            max-width: 400px;
-        }
-
-        .auth-icon {
-            font-size: 4rem;
-            margin-bottom: 20px;
-        }
-
-        .microsoft-signin-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 12px;
-            padding: 12px 24px;
-            background: white;
-            border: 1px solid #8c8c8c;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 1rem;
-            color: #5e5e5e;
-            transition: all 0.3s ease;
-            text-decoration: none;
-        }
-
-        .microsoft-signin-btn:hover {
-            background: #f8f8f8;
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-        }
-
-        .microsoft-logo {
-            width: 20px;
-            height: 20px;
         }
 
         /* Original Monitor Styles */
@@ -778,6 +885,34 @@
             100% { transform: rotate(360deg); }
         }
 
+        .microsoft-signin-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 24px;
+            background: white;
+            border: 1px solid #8c8c8c;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            color: #5e5e5e;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            width: 100%;
+            justify-content: center;
+            margin-top: 20px;
+        }
+
+        .microsoft-signin-btn:hover {
+            background: #f8f8f8;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .microsoft-logo {
+            width: 20px;
+            height: 20px;
+        }
+
         @media (max-width: 768px) {
             .form-row {
                 grid-template-columns: 1fr;
@@ -798,6 +933,12 @@
                 justify-content: center;
             }
 
+            .tenant-badge {
+                position: static;
+                margin-bottom: 20px;
+                text-align: center;
+            }
+
             .diagnostics-panel {
                 width: calc(100% - 40px);
                 right: 20px;
@@ -809,8 +950,11 @@
 <body>
     <div class="container">
         <div class="header">
+            <div class="tenant-badge" id="tenantBadge" style="display: none;">
+                🏢 <span id="tenantName">Not connected</span>
+            </div>
             <h1>📊 Power Automate Monitor</h1>
-            <p>Real-time monitoring and alerting for your Microsoft Power Automate flows</p>
+            <p>Multi-tenant monitoring for Microsoft Power Automate flows</p>
             <div class="user-info" id="userInfo" style="display: none;">
                 <div class="user-avatar" id="userAvatar">?</div>
                 <span class="user-name" id="userName">Not signed in</span>
@@ -854,7 +998,7 @@
                 </div>
 
                 <div class="controls">
-                    <button class="btn btn-primary" id="connectBtn">🔌 Connect to Power Platform</button>
+                    <button class="btn btn-primary" id="connectBtn">🔌 Connect to Tenant</button>
                     <button class="btn btn-secondary" id="refreshBtn" disabled>🔄 Refresh Data</button>
                     <button class="btn btn-secondary" id="exportBtn" disabled>📊 Export Report</button>
                     <button class="btn btn-secondary" id="toggleDemoBtn">🎭 Toggle Demo Mode</button>
@@ -873,7 +1017,7 @@
                     <div class="flows-list" id="flowsList">
                         <div class="loading">
                             <div class="spinner"></div>
-                            <p>Select a connection from Settings or click "Connect to Power Platform" to start monitoring</p>
+                            <p>Select a connection from Settings or click "Connect to Tenant" to start monitoring</p>
                         </div>
                     </div>
                 </div>
@@ -881,25 +1025,31 @@
 
             <!-- Settings Tab -->
             <div id="settingsTab" class="tab-content">
-                <div id="authRequired" class="auth-container">
-                    <div class="auth-icon">🔐</div>
-                    <h2>Authentication Required</h2>
-                    <p>Please sign in with your Microsoft Entra ID account to access connection settings</p>
-                    <button class="microsoft-signin-btn" onclick="authManager.signIn()">
-                        <svg class="microsoft-logo" viewBox="0 0 21 21">
-                            <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
-                            <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
-                            <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
-                            <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
-                        </svg>
-                        Sign in with Microsoft
-                    </button>
-                </div>
-
-                <div id="settingsContent" class="settings-container" style="display: none;">
+                <div class="settings-container">
                     <div class="settings-header">
-                        <h2>Connection Settings</h2>
-                        <p>Manage your Power Automate environment connections securely</p>
+                        <h2>Multi-Tenant Connection Settings</h2>
+                        <p>Configure connections to monitor Power Automate flows across different Azure tenants</p>
+                    </div>
+
+                    <div class="settings-section">
+                        <h3>Authentication Mode</h3>
+                        <div class="auth-mode-selector">
+                            <div class="auth-mode-card active" onclick="selectAuthMode('delegated')">
+                                <div class="auth-mode-icon">👤</div>
+                                <div class="auth-mode-title">Delegated Access</div>
+                                <div class="auth-mode-desc">Sign in as yourself to access tenants</div>
+                            </div>
+                            <div class="auth-mode-card" onclick="selectAuthMode('application')">
+                                <div class="auth-mode-icon">🤖</div>
+                                <div class="auth-mode-title">Application Access</div>
+                                <div class="auth-mode-desc">Use app-only authentication</div>
+                            </div>
+                            <div class="auth-mode-card" onclick="selectAuthMode('guest')">
+                                <div class="auth-mode-icon">🌐</div>
+                                <div class="auth-mode-title">Guest Access</div>
+                                <div class="auth-mode-desc">Access as guest user in other tenants</div>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="settings-section">
@@ -916,8 +1066,25 @@
                                 <label class="form-label">
                                     Connection Name <span class="required">*</span>
                                 </label>
-                                <input type="text" class="form-input" id="connName" placeholder="e.g., Production Environment" required>
+                                <input type="text" class="form-input" id="connName" placeholder="e.g., Contoso Production" required>
                                 <span class="form-helper">A friendly name to identify this connection</span>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label class="form-label">
+                                        Target Tenant ID <span class="required">*</span>
+                                    </label>
+                                    <input type="text" class="form-input" id="connTargetTenantId" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" required>
+                                    <span class="form-helper">The tenant you want to connect to</span>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">
+                                        Target Tenant Domain
+                                    </label>
+                                    <input type="text" class="form-input" id="connTargetDomain" placeholder="contoso.onmicrosoft.com">
+                                    <span class="form-helper">Optional: tenant domain name</span>
+                                </div>
                             </div>
 
                             <div class="form-row">
@@ -936,32 +1103,38 @@
                                 </div>
                             </div>
 
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label class="form-label">
-                                        Client ID <span class="required">*</span>
-                                    </label>
-                                    <input type="text" class="form-input" id="connClientId" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" required>
-                                    <span class="form-helper">Azure AD App Registration Client ID</span>
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">
-                                        Tenant ID <span class="required">*</span>
-                                    </label>
-                                    <input type="text" class="form-input" id="connTenantId" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" required>
-                                    <span class="form-helper">Azure AD Tenant ID</span>
+                            <div class="form-group full-width" id="appRegistrationSection">
+                                <label class="form-label">
+                                    Multi-Tenant App Registration
+                                </label>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label class="form-label">
+                                            Client ID <span class="required">*</span>
+                                        </label>
+                                        <input type="text" class="form-input" id="connClientId" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" required>
+                                        <span class="form-helper">Must be configured as multi-tenant app</span>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">
+                                            Client Secret (App-only)
+                                        </label>
+                                        <input type="password" class="form-input" id="connClientSecret" placeholder="Enter for application auth">
+                                        <span class="form-helper">Required only for app-only auth</span>
+                                    </div>
                                 </div>
                             </div>
 
                             <div class="form-group full-width">
                                 <label class="form-label">
-                                    API Version
+                                    Connection Type
                                 </label>
-                                <select class="form-input" id="connApiVersion">
-                                    <option value="2016-11-01" selected>2016-11-01 (Recommended)</option>
-                                    <option value="2023-01-01">2023-01-01 (Preview)</option>
+                                <select class="form-input" id="connType">
+                                    <option value="powerautomate">Power Automate Management API</option>
+                                    <option value="graph">Microsoft Graph API</option>
+                                    <option value="logicapps">Azure Logic Apps</option>
                                 </select>
-                                <span class="form-helper">Power Automate Management API version to use</span>
+                                <span class="form-helper">Select the API endpoint to use</span>
                             </div>
 
                             <div class="form-actions">
@@ -972,6 +1145,58 @@
                         </form>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Multi-Tenant Auth Modal -->
+    <div class="auth-modal" id="authModal">
+        <div class="auth-modal-content">
+            <div class="auth-modal-header">
+                <h2>🔐 Connect to Tenant</h2>
+                <p>Choose how to authenticate to the target tenant</p>
+            </div>
+
+            <div class="auth-option" onclick="selectAuthOption('current')">
+                <div class="auth-option-title">
+                    <span>👤</span>
+                    <span>Use Current Credentials</span>
+                </div>
+                <div class="auth-option-desc">
+                    Sign in with your current account (requires guest access or membership in target tenant)
+                </div>
+            </div>
+
+            <div class="auth-option" onclick="selectAuthOption('switch')">
+                <div class="auth-option-title">
+                    <span>🔄</span>
+                    <span>Switch Tenant</span>
+                </div>
+                <div class="auth-option-desc">
+                    Sign in with an account from the target tenant
+                </div>
+            </div>
+
+            <div class="auth-option" onclick="selectAuthOption('app')">
+                <div class="auth-option-title">
+                    <span>🤖</span>
+                    <span>Application Authentication</span>
+                </div>
+                <div class="auth-option-desc">
+                    Use a multi-tenant app registration with client credentials
+                </div>
+            </div>
+
+            <div class="tenant-input-group" id="tenantInputGroup">
+                <div class="form-group">
+                    <label class="form-label">Target Tenant ID</label>
+                    <input type="text" class="form-input" id="modalTenantId" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button class="btn btn-secondary" onclick="closeAuthModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="proceedWithAuth()">Connect</button>
             </div>
         </div>
     </div>
@@ -1076,228 +1301,192 @@
             logger.hide();
         }
 
-        // MSAL Configuration
-        const msalConfig = {
-            auth: {
-                clientId: 'c05c6850-bae6-4dfb-a6ea-c408868014a1',
-                authority: 'https://login.microsoftonline.com/30b2cab5-4b41-42ba-9ae3-af22c87241d9',
-                redirectUri: window.location.origin
-            },
-            cache: {
-                cacheLocation: 'sessionStorage',
-                storeAuthStateInCookie: false
-            }
-        };
-
-        const loginRequest = {
-            scopes: ['User.Read', 'https://management.azure.com/.default']
-        };
-
-        // Initialize MSAL
-        let msalInstance = null;
-        
-        class AuthManager {
+        // Multi-Tenant MSAL Configuration
+        class MultiTenantAuthManager {
             constructor() {
                 this.isAuthenticated = false;
                 this.currentUser = null;
+                this.currentTenant = null;
+                this.msalInstances = new Map(); // Store MSAL instances per tenant
+                this.authMode = 'delegated';
                 
-                logger.log('Initializing AuthManager', 'info');
-                
-                if (!msalConfig.auth.authority.includes('YOUR_TENANT_ID')) {
-                    try {
-                        msalInstance = new msal.PublicClientApplication(msalConfig);
-                        this.handleRedirect();
-                        logger.log('MSAL initialized successfully', 'success');
-                    } catch (error) {
-                        logger.log('MSAL initialization error', 'error', error);
-                    }
-                } else {
-                    logger.log('MSAL not configured - update tenant ID', 'warning');
-                }
-            }
-
-            async handleRedirect() {
-                try {
-                    const response = await msalInstance.handleRedirectPromise();
-                    if (response) {
-                        this.handleAuthResponse(response);
-                    } else {
-                        const accounts = msalInstance.getAllAccounts();
-                        if (accounts.length > 0) {
-                            this.currentUser = accounts[0];
-                            this.isAuthenticated = true;
-                            this.updateUI();
-                            logger.log('User already authenticated', 'success', { user: this.currentUser.username });
-                        }
-                    }
-                } catch (error) {
-                    logger.log('Authentication redirect error', 'error', error);
-                }
-            }
-
-            async signIn() {
-                logger.log('Starting sign-in process', 'info');
-                
-                if (!msalInstance) {
-                    this.simulateSignIn();
-                    return;
-                }
-
-                try {
-                    const response = await msalInstance.loginPopup(loginRequest);
-                    this.handleAuthResponse(response);
-                } catch (error) {
-                    logger.log('Sign in failed', 'error', error);
-                    showAlert('Authentication failed. Please try again.', 'error');
-                }
-            }
-
-            async getAccessToken() {
-                if (!msalInstance || !this.currentUser) {
-                    logger.log('No authenticated user for token request', 'warning');
-                    return null;
-                }
-
-                const tokenRequest = {
-                    scopes: ['https://management.azure.com/.default'],
-                    account: this.currentUser
+                // Your app registration - MUST be configured as multi-tenant in Azure AD
+                this.appConfig = {
+                    clientId: 'YOUR_MULTI_TENANT_APP_CLIENT_ID', // Replace with your multi-tenant app ID
+                    redirectUri: window.location.origin
                 };
 
+                logger.log('MultiTenantAuthManager initialized', 'info');
+            }
+
+            // Create MSAL instance for specific tenant
+            createMsalInstance(tenantId) {
+                const config = {
+                    auth: {
+                        clientId: this.appConfig.clientId,
+                        authority: `https://login.microsoftonline.com/${tenantId}`,
+                        redirectUri: this.appConfig.redirectUri,
+                        navigateToLoginRequestUrl: false
+                    },
+                    cache: {
+                        cacheLocation: 'sessionStorage',
+                        storeAuthStateInCookie: false
+                    }
+                };
+
+                logger.log('Creating MSAL instance for tenant', 'info', { tenantId });
+                return new msal.PublicClientApplication(config);
+            }
+
+            // Get or create MSAL instance for tenant
+            getMsalInstance(tenantId) {
+                if (!this.msalInstances.has(tenantId)) {
+                    this.msalInstances.set(tenantId, this.createMsalInstance(tenantId));
+                }
+                return this.msalInstances.get(tenantId);
+            }
+
+            // Sign in to specific tenant
+            async signInToTenant(tenantId, usePopup = true) {
+                logger.log('Signing in to tenant', 'info', { tenantId });
+                
                 try {
-                    logger.log('Requesting access token', 'info');
-                    const response = await msalInstance.acquireTokenSilent(tokenRequest);
-                    logger.log('Access token acquired', 'success');
-                    return response.accessToken;
+                    const msalInstance = this.getMsalInstance(tenantId);
+                    
+                    const loginRequest = {
+                        scopes: [
+                            'User.Read',
+                            'https://management.azure.com/.default'
+                        ],
+                        extraQueryParameters: {
+                            domain_hint: tenantId // Help direct to right tenant
+                        }
+                    };
+
+                    let response;
+                    if (usePopup) {
+                        response = await msalInstance.loginPopup(loginRequest);
+                    } else {
+                        await msalInstance.loginRedirect(loginRequest);
+                        return; // Redirect will navigate away
+                    }
+
+                    if (response) {
+                        this.currentUser = response.account;
+                        this.currentTenant = tenantId;
+                        this.isAuthenticated = true;
+                        logger.log('Successfully authenticated to tenant', 'success', { 
+                            user: response.account.username,
+                            tenant: tenantId 
+                        });
+                        this.updateUI();
+                        return response;
+                    }
                 } catch (error) {
-                    logger.log('Silent token acquisition failed, trying popup', 'warning');
-                    try {
-                        const response = await msalInstance.acquireTokenPopup(tokenRequest);
-                        logger.log('Access token acquired via popup', 'success');
-                        return response.accessToken;
-                    } catch (popupError) {
-                        logger.log('Token acquisition failed', 'error', popupError);
+                    logger.log('Tenant authentication failed', 'error', error);
+                    throw error;
+                }
+            }
+
+            // Get access token for specific tenant
+            async getAccessTokenForTenant(tenantId, scopes = ['https://management.azure.com/.default']) {
+                logger.log('Requesting access token for tenant', 'info', { tenantId });
+                
+                try {
+                    const msalInstance = this.getMsalInstance(tenantId);
+                    const accounts = msalInstance.getAllAccounts();
+                    
+                    if (accounts.length === 0) {
+                        logger.log('No accounts found, need to sign in first', 'warning');
+                        await this.signInToTenant(tenantId);
                         return null;
                     }
+
+                    const tokenRequest = {
+                        scopes: scopes,
+                        account: accounts[0]
+                    };
+
+                    try {
+                        const response = await msalInstance.acquireTokenSilent(tokenRequest);
+                        logger.log('Token acquired silently', 'success');
+                        return response.accessToken;
+                    } catch (silentError) {
+                        logger.log('Silent token acquisition failed, trying popup', 'warning');
+                        const response = await msalInstance.acquireTokenPopup(tokenRequest);
+                        logger.log('Token acquired via popup', 'success');
+                        return response.accessToken;
+                    }
+                } catch (error) {
+                    logger.log('Failed to get access token', 'error', error);
+                    throw error;
                 }
             }
 
-            handleAuthResponse(response) {
-                this.currentUser = response.account;
-                this.isAuthenticated = true;
-                this.updateUI();
-                logger.log('Authentication successful', 'success', { user: this.currentUser.name });
-                showAlert(`Welcome, ${this.currentUser.name}!`, 'success');
-            }
-
-            signOut() {
-                logger.log('Signing out user', 'info');
+            // Sign out from specific tenant
+            async signOutFromTenant(tenantId) {
+                logger.log('Signing out from tenant', 'info', { tenantId });
                 
-                if (!msalInstance) {
-                    this.isAuthenticated = false;
-                    this.currentUser = null;
-                    this.updateUI();
-                    showAlert('Signed out successfully', 'success');
-                    return;
+                const msalInstance = this.getMsalInstance(tenantId);
+                const accounts = msalInstance.getAllAccounts();
+                
+                if (accounts.length > 0) {
+                    await msalInstance.logoutPopup({
+                        account: accounts[0]
+                    });
                 }
 
-                const logoutRequest = {
-                    account: msalInstance.getAccountByUsername(this.currentUser.username)
-                };
-
-                msalInstance.logoutPopup(logoutRequest).then(() => {
-                    this.isAuthenticated = false;
+                if (this.currentTenant === tenantId) {
                     this.currentUser = null;
+                    this.currentTenant = null;
+                    this.isAuthenticated = false;
                     this.updateUI();
-                    logger.log('User signed out', 'info');
-                });
-            }
-
-            simulateSignIn() {
-                this.isAuthenticated = true;
-                this.currentUser = {
-                    name: 'Demo User',
-                    username: 'demo@contoso.com',
-                    localAccountId: 'demo-user-id'
-                };
-                this.updateUI();
-                logger.log('Demo mode activated', 'warning', { user: 'Demo User' });
-                showAlert('Signed in with demo account. Configure MSAL for production use.', 'warning');
+                }
             }
 
             updateUI() {
                 const userInfo = document.getElementById('userInfo');
-                const authRequired = document.getElementById('authRequired');
-                const settingsContent = document.getElementById('settingsContent');
                 const userName = document.getElementById('userName');
                 const userAvatar = document.getElementById('userAvatar');
+                const tenantBadge = document.getElementById('tenantBadge');
+                const tenantName = document.getElementById('tenantName');
 
                 if (this.isAuthenticated && this.currentUser) {
                     userInfo.style.display = 'flex';
                     userName.textContent = this.currentUser.name || this.currentUser.username;
                     userAvatar.textContent = (this.currentUser.name || 'U')[0].toUpperCase();
                     
-                    if (document.getElementById('settingsTab').classList.contains('active')) {
-                        authRequired.style.display = 'none';
-                        settingsContent.style.display = 'block';
-                        loadSavedConnections();
+                    if (this.currentTenant) {
+                        tenantBadge.style.display = 'block';
+                        tenantName.textContent = `Tenant: ${this.currentTenant}`;
                     }
                 } else {
                     userInfo.style.display = 'none';
-                    if (document.getElementById('settingsTab').classList.contains('active')) {
-                        authRequired.style.display = 'flex';
-                        settingsContent.style.display = 'none';
-                    }
+                    tenantBadge.style.display = 'none';
                 }
             }
         }
 
-        // Initialize Auth Manager
-        const authManager = new AuthManager();
+        // Initialize Multi-Tenant Auth Manager
+        const authManager = new MultiTenantAuthManager();
 
-        // Tab switching
-        function switchTab(tabName) {
-            logger.log(`Switching to ${tabName} tab`, 'info');
-            
-            document.querySelectorAll('.nav-tab').forEach(tab => {
-                tab.classList.remove('active');
-            });
-            event.target.classList.add('active');
-
-            document.querySelectorAll('.tab-content').forEach(content => {
-                content.classList.remove('active');
-            });
-
-            if (tabName === 'monitor') {
-                document.getElementById('monitorTab').classList.add('active');
-            } else if (tabName === 'settings') {
-                document.getElementById('settingsTab').classList.add('active');
-                
-                if (!authManager.isAuthenticated) {
-                    document.getElementById('authRequired').style.display = 'flex';
-                    document.getElementById('settingsContent').style.display = 'none';
-                } else {
-                    document.getElementById('authRequired').style.display = 'none';
-                    document.getElementById('settingsContent').style.display = 'block';
-                    loadSavedConnections();
-                }
-            }
-        }
-
-        // Connection Manager
-        class ConnectionManager {
+        // Connection Manager with Multi-Tenant Support
+        class MultiTenantConnectionManager {
             constructor() {
                 this.connections = this.loadFromStorage();
                 this.activeConnection = null;
-                logger.log('ConnectionManager initialized', 'info', { connectionsCount: this.connections.length });
+                logger.log('MultiTenantConnectionManager initialized', 'info', { 
+                    connectionsCount: this.connections.length 
+                });
             }
 
             loadFromStorage() {
-                const stored = localStorage.getItem('powerAutomateConnections');
+                const stored = localStorage.getItem('multiTenantConnections');
                 return stored ? JSON.parse(stored) : [];
             }
 
             saveToStorage() {
-                localStorage.setItem('powerAutomateConnections', JSON.stringify(this.connections));
+                localStorage.setItem('multiTenantConnections', JSON.stringify(this.connections));
                 logger.log('Connections saved to storage', 'info');
             }
 
@@ -1307,23 +1496,15 @@
                 connection.createdBy = authManager.currentUser?.username || 'Unknown';
                 this.connections.push(connection);
                 this.saveToStorage();
-                logger.log('Connection added', 'success', { name: connection.name });
+                logger.log('Connection added', 'success', { 
+                    name: connection.name,
+                    targetTenant: connection.targetTenantId 
+                });
                 return connection;
             }
 
-            updateConnection(id, updates) {
-                const index = this.connections.findIndex(c => c.id === id);
-                if (index !== -1) {
-                    this.connections[index] = { ...this.connections[index], ...updates };
-                    this.saveToStorage();
-                    logger.log('Connection updated', 'info', { id });
-                    return this.connections[index];
-                }
-                return null;
-            }
-
             deleteConnection(id) {
-                const conn = this.getConnection(id);
+                const conn = this.connections.find(c => c.id === id);
                 this.connections = this.connections.filter(c => c.id !== id);
                 this.saveToStorage();
                 if (this.activeConnection?.id === id) {
@@ -1332,46 +1513,34 @@
                 logger.log('Connection deleted', 'info', { name: conn?.name });
             }
 
-            getConnection(id) {
-                return this.connections.find(c => c.id === id);
-            }
-
             setActiveConnection(id) {
-                this.activeConnection = this.getConnection(id);
-                logger.log('Active connection set', 'info', { name: this.activeConnection?.name });
+                this.activeConnection = this.connections.find(c => c.id === id);
+                logger.log('Active connection set', 'info', { 
+                    name: this.activeConnection?.name,
+                    targetTenant: this.activeConnection?.targetTenantId 
+                });
                 return this.activeConnection;
             }
         }
 
-        const connectionManager = new ConnectionManager();
+        const connectionManager = new MultiTenantConnectionManager();
 
-        // Power Automate API Client
-        class PowerAutomateAPIClient {
+        // Power Automate API Client with Multi-Tenant Support
+        class MultiTenantPowerAutomateAPI {
             constructor() {
-                this.baseUrl = 'https://management.azure.com';
-                this.apiVersion = '2016-11-01';
+                this.baseUrl = 'https://api.flow.microsoft.com';
+                this.graphUrl = 'https://graph.microsoft.com';
+                this.managementUrl = 'https://management.azure.com';
                 this.demoMode = false;
             }
 
-            async authenticate(config) {
-                logger.log('Authenticating with Power Automate API', 'info');
-                
-                if (this.demoMode) {
-                    logger.log('Demo mode - simulating authentication', 'warning');
-                    return 'demo-token';
-                }
-
-                const token = await authManager.getAccessToken();
-                if (!token) {
-                    throw new Error('Failed to acquire access token');
-                }
-                return token;
-            }
-
             async fetchFlows(config, accessToken) {
-                logger.log('Fetching flows from API', 'info', { 
-                    environmentId: config.environmentId,
-                    apiVersion: config.apiVersion || this.apiVersion 
+                const { targetTenantId, environmentId, connectionType } = config;
+                
+                logger.log('Fetching flows from tenant', 'info', { 
+                    targetTenant: targetTenantId,
+                    environment: environmentId,
+                    type: connectionType 
                 });
 
                 if (this.demoMode) {
@@ -1380,9 +1549,22 @@
                 }
 
                 try {
-                    const url = `${this.baseUrl}/subscriptions/${config.subscriptionId}/resourceGroups/${config.resourceGroup}/providers/Microsoft.Logic/workflows?api-version=${config.apiVersion || this.apiVersion}`;
-                    
-                    logger.log('API Request', 'info', { url });
+                    let url;
+                    switch (connectionType) {
+                        case 'graph':
+                            // Use Microsoft Graph API
+                            url = `${this.graphUrl}/v1.0/subscriptions/${config.subscriptionId}/resourceGroups/${config.resourceGroup}/providers/Microsoft.Logic/workflows`;
+                            break;
+                        case 'logicapps':
+                            // Use Azure Management API for Logic Apps
+                            url = `${this.managementUrl}/subscriptions/${config.subscriptionId}/resourceGroups/${config.resourceGroup}/providers/Microsoft.Logic/workflows?api-version=2019-05-01`;
+                            break;
+                        default:
+                            // Use Power Automate Management API
+                            url = `${this.baseUrl}/providers/Microsoft.ProcessSimple/environments/${environmentId}/flows?api-version=2016-11-01`;
+                    }
+
+                    logger.log('API Request', 'info', { url, tenant: targetTenantId });
 
                     const response = await fetch(url, {
                         method: 'GET',
@@ -1395,36 +1577,39 @@
                     if (!response.ok) {
                         const errorText = await response.text();
                         logger.log('API request failed', 'error', { 
-                            status: response.status, 
-                            statusText: response.statusText,
+                            status: response.status,
                             error: errorText 
                         });
                         
-                        // Fall back to demo mode if API fails
-                        logger.log('Falling back to demo mode', 'warning');
-                        this.demoMode = true;
-                        return this.generateMockFlows();
+                        // Check if it's a cross-tenant issue
+                        if (response.status === 401 || response.status === 403) {
+                            throw new Error('Access denied. Ensure the app registration has proper permissions in the target tenant.');
+                        }
+                        
+                        throw new Error(`API Error: ${response.status} - ${errorText}`);
                     }
 
                     const data = await response.json();
-                    logger.log('Flows fetched successfully', 'success', { count: data.value?.length || 0 });
+                    logger.log('Flows fetched successfully', 'success', { 
+                        count: data.value?.length || 0,
+                        tenant: targetTenantId 
+                    });
                     
                     return this.transformFlowData(data.value || []);
                 } catch (error) {
-                    logger.log('Network error - falling back to demo mode', 'error', error);
-                    this.demoMode = true;
-                    return this.generateMockFlows();
+                    logger.log('Failed to fetch flows', 'error', error);
+                    throw error;
                 }
             }
 
             transformFlowData(rawFlows) {
                 return rawFlows.map(flow => ({
-                    id: flow.id,
-                    name: flow.name,
+                    id: flow.id || flow.name,
+                    name: flow.properties?.displayName || flow.name,
                     status: flow.properties?.state || 'Unknown',
                     lastRun: flow.properties?.lastRunTime || new Date().toISOString(),
                     lastRunStatus: this.mapRunStatus(flow.properties?.lastRunStatus),
-                    successRate: Math.floor(Math.random() * 40 + 60), // Would need runs history API
+                    successRate: Math.floor(Math.random() * 40 + 60),
                     totalRuns: flow.properties?.totalRuns || 0,
                     failedRuns: flow.properties?.failedRuns || 0,
                     avgDuration: flow.properties?.avgDuration || 0
@@ -1444,16 +1629,16 @@
 
             generateMockFlows() {
                 const flowNames = [
-                    'Invoice Processing Automation',
-                    'Customer Onboarding Workflow',
-                    'Email Notification System',
-                    'Data Sync - CRM to SharePoint',
-                    'Monthly Report Generator',
-                    'Approval Request Handler',
-                    'File Backup Automation',
-                    'Lead Scoring Calculator',
-                    'Contract Renewal Reminder',
-                    'Expense Report Approval'
+                    'Cross-Tenant Invoice Processing',
+                    'Multi-Company Approval Workflow',
+                    'Tenant-to-Tenant Data Sync',
+                    'Global Email Notification System',
+                    'Cross-Organization Report Generator',
+                    'Multi-Tenant User Provisioning',
+                    'Inter-Company File Transfer',
+                    'Global Compliance Monitor',
+                    'Cross-Tenant Backup Automation',
+                    'Multi-Organization Analytics'
                 ];
 
                 const statuses = ['Enabled', 'Suspended', 'Stopped'];
@@ -1473,35 +1658,97 @@
             }
         }
 
-        // Power Automate Monitor Class
-        class PowerAutomateMonitor {
+        // Power Automate Monitor with Multi-Tenant Support
+        class MultiTenantPowerAutomateMonitor {
             constructor() {
                 this.flows = [];
                 this.filteredFlows = [];
                 this.isConnected = false;
                 this.refreshTimer = null;
-                this.accessToken = null;
-                this.apiClient = new PowerAutomateAPIClient();
-                this.config = {
-                    environmentId: '',
-                    clientId: '',
-                    tenantId: '',
-                    refreshInterval: 30,
-                    apiVersion: '2016-11-01'
-                };
+                this.apiClient = new MultiTenantPowerAutomateAPI();
+                this.currentConnection = null;
                 
-                logger.log('PowerAutomateMonitor initialized', 'success');
+                logger.log('MultiTenantPowerAutomateMonitor initialized', 'success');
                 this.initializeEventListeners();
             }
 
             initializeEventListeners() {
                 logger.log('Setting up event listeners', 'info');
                 
-                document.getElementById('connectBtn').addEventListener('click', () => this.handleConnect());
+                document.getElementById('connectBtn').addEventListener('click', () => this.showAuthModal());
                 document.getElementById('refreshBtn').addEventListener('click', () => this.refreshData());
                 document.getElementById('exportBtn').addEventListener('click', () => this.exportReport());
                 document.getElementById('toggleDemoBtn').addEventListener('click', () => this.toggleDemoMode());
                 document.getElementById('searchBox').addEventListener('input', (e) => this.filterFlows(e.target.value));
+            }
+
+            showAuthModal() {
+                if (this.isConnected) {
+                    this.disconnect();
+                    return;
+                }
+
+                const modal = document.getElementById('authModal');
+                modal.classList.add('show');
+                logger.log('Auth modal opened', 'info');
+            }
+
+            async connectToTenant(connection, authOption) {
+                logger.log('Connecting to tenant', 'info', { 
+                    connection: connection.name,
+                    targetTenant: connection.targetTenantId,
+                    authOption 
+                });
+
+                try {
+                    showAlert('Connecting to tenant...', 'warning');
+                    
+                    // Authenticate to the target tenant
+                    await authManager.signInToTenant(connection.targetTenantId);
+                    
+                    // Get access token for the target tenant
+                    const accessToken = await authManager.getAccessTokenForTenant(connection.targetTenantId);
+                    
+                    if (!accessToken) {
+                        throw new Error('Failed to obtain access token');
+                    }
+
+                    // Fetch flows from the target tenant
+                    this.currentConnection = connection;
+                    this.flows = await this.apiClient.fetchFlows({
+                        targetTenantId: connection.targetTenantId,
+                        environmentId: connection.environmentId,
+                        connectionType: connection.connectionType || 'powerautomate',
+                        subscriptionId: connection.subscriptionId,
+                        resourceGroup: connection.resourceGroup
+                    }, accessToken);
+                    
+                    this.filteredFlows = [...this.flows];
+                    this.updateStats();
+                    this.renderFlows();
+                    this.setConnectedState(true);
+                    
+                    showAlert(`Connected to ${connection.name}!`, 'success');
+                    this.startAutoRefresh(connection.refreshInterval);
+                    
+                } catch (error) {
+                    logger.log('Connection failed', 'error', error);
+                    this.setConnectedState(false);
+                    showAlert(`Connection failed: ${error.message}`, 'error');
+                }
+            }
+
+            disconnect() {
+                this.setConnectedState(false);
+                this.stopAutoRefresh();
+                
+                if (this.currentConnection && authManager.currentTenant) {
+                    authManager.signOutFromTenant(authManager.currentTenant);
+                }
+                
+                this.currentConnection = null;
+                logger.log('Disconnected from tenant', 'info');
+                showAlert('Disconnected from tenant', 'success');
             }
 
             toggleDemoMode() {
@@ -1515,68 +1762,33 @@
                 }
             }
 
-            async handleConnect() {
-                logger.log('Connection process started', 'info');
-                
-                if (this.isConnected) {
-                    this.setConnectedState(false);
-                    logger.log('Disconnected from Power Platform', 'info');
-                    showAlert('Disconnected from Power Platform', 'success');
+            async refreshData() {
+                if (!this.currentConnection) {
+                    logger.log('No active connection to refresh', 'warning');
                     return;
                 }
 
-                if (connectionManager.activeConnection) {
-                    this.config = {
-                        environmentId: connectionManager.activeConnection.environmentId,
-                        clientId: connectionManager.activeConnection.clientId,
-                        tenantId: connectionManager.activeConnection.tenantId,
-                        refreshInterval: connectionManager.activeConnection.refreshInterval,
-                        apiVersion: connectionManager.activeConnection.apiVersion || '2016-11-01',
-                        subscriptionId: connectionManager.activeConnection.subscriptionId,
-                        resourceGroup: connectionManager.activeConnection.resourceGroup
-                    };
-                    logger.log('Using saved connection', 'info', { name: connectionManager.activeConnection.name });
-                }
-
-                try {
-                    this.validateConfiguration();
-                    showAlert('Connecting to Power Platform...', 'warning');
-                    
-                    this.accessToken = await this.apiClient.authenticate(this.config);
-                    await this.fetchFlows();
-                    
-                    this.setConnectedState(true);
-                    showAlert('Successfully connected! Monitoring active flows.', 'success');
-                    this.startAutoRefresh();
-                } catch (error) {
-                    logger.log('Connection failed', 'error', error);
-                    this.setConnectedState(false);
-                    showAlert(`Connection failed: ${error.message}`, 'error');
-                }
-            }
-
-            validateConfiguration() {
-                const { environmentId, clientId, tenantId } = this.config;
-                
-                if (!this.apiClient.demoMode && (!environmentId || !clientId || !tenantId)) {
-                    throw new Error('No connection configured. Please add a connection in Settings or enable Demo Mode');
-                }
-
-                logger.log('Configuration validated', 'success');
-            }
-
-            async fetchFlows() {
-                logger.log('Fetching flows...', 'info');
+                logger.log('Refreshing data...', 'info');
+                showAlert('Refreshing flow data...', 'warning');
                 
                 try {
-                    this.flows = await this.apiClient.fetchFlows(this.config, this.accessToken);
+                    const accessToken = await authManager.getAccessTokenForTenant(
+                        this.currentConnection.targetTenantId
+                    );
+                    
+                    this.flows = await this.apiClient.fetchFlows({
+                        targetTenantId: this.currentConnection.targetTenantId,
+                        environmentId: this.currentConnection.environmentId,
+                        connectionType: this.currentConnection.connectionType || 'powerautomate'
+                    }, accessToken);
+                    
                     this.filteredFlows = [...this.flows];
                     this.updateStats();
                     this.renderFlows();
-                    logger.log(`Fetched ${this.flows.length} flows`, 'success');
+                    showAlert('Data refreshed successfully!', 'success');
                 } catch (error) {
-                    logger.log('Failed to fetch flows', 'error', error);
-                    throw error;
+                    logger.log('Refresh failed', 'error', error);
+                    showAlert('Failed to refresh data', 'error');
                 }
             }
 
@@ -1653,23 +1865,12 @@
                 logger.log('Flows filtered', 'info', { searchTerm, results: this.filteredFlows.length });
             }
 
-            async refreshData() {
-                logger.log('Refreshing data...', 'info');
-                showAlert('Refreshing flow data...', 'warning');
-                
-                try {
-                    await this.fetchFlows();
-                    showAlert('Data refreshed successfully!', 'success');
-                } catch (error) {
-                    logger.log('Refresh failed', 'error', error);
-                    showAlert('Failed to refresh data', 'error');
-                }
-            }
-
             exportReport() {
                 const report = {
                     timestamp: new Date().toISOString(),
-                    environment: this.config.environmentId,
+                    tenant: this.currentConnection?.targetTenantId,
+                    environment: this.currentConnection?.environmentId,
+                    connection: this.currentConnection?.name,
                     mode: this.apiClient.demoMode ? 'Demo' : 'Live',
                     summary: {
                         total: this.flows.length,
@@ -1714,18 +1915,18 @@
                     refreshBtn.disabled = true;
                     exportBtn.disabled = true;
                     searchBox.disabled = true;
-                    connectBtn.textContent = '🔌 Connect to Power Platform';
+                    connectBtn.textContent = '🔌 Connect to Tenant';
                     this.stopAutoRefresh();
                 }
             }
 
-            startAutoRefresh() {
+            startAutoRefresh(interval = 30) {
                 this.stopAutoRefresh();
-                const interval = this.config.refreshInterval * 1000;
-                logger.log(`Starting auto-refresh every ${this.config.refreshInterval} seconds`, 'info');
+                const ms = interval * 1000;
+                logger.log(`Starting auto-refresh every ${interval} seconds`, 'info');
                 this.refreshTimer = setInterval(() => {
                     this.refreshData();
-                }, interval);
+                }, ms);
             }
 
             stopAutoRefresh() {
@@ -1737,41 +1938,63 @@
             }
         }
 
-        // Test Connection Function
-        async function testConnection() {
-            logger.log('Testing connection...', 'info');
-            
-            const config = {
-                environmentId: document.getElementById('connEnvId').value,
-                clientId: document.getElementById('connClientId').value,
-                tenantId: document.getElementById('connTenantId').value,
-                apiVersion: document.getElementById('connApiVersion').value
-            };
+        // Auth Modal Functions
+        let selectedAuthOption = null;
 
-            if (!config.environmentId || !config.clientId || !config.tenantId) {
-                showAlert('Please fill in all required fields', 'error');
-                logger.log('Test failed - missing fields', 'error');
+        function selectAuthOption(option) {
+            selectedAuthOption = option;
+            document.querySelectorAll('.auth-option').forEach(el => {
+                el.classList.remove('selected');
+            });
+            event.currentTarget.classList.add('selected');
+            
+            const tenantInputGroup = document.getElementById('tenantInputGroup');
+            if (option === 'switch') {
+                tenantInputGroup.classList.add('show');
+            } else {
+                tenantInputGroup.classList.remove('show');
+            }
+            
+            logger.log('Auth option selected', 'info', { option });
+        }
+
+        function closeAuthModal() {
+            document.getElementById('authModal').classList.remove('show');
+            selectedAuthOption = null;
+        }
+
+        async function proceedWithAuth() {
+            if (!selectedAuthOption) {
+                showAlert('Please select an authentication method', 'warning');
                 return;
             }
 
-            try {
-                const apiClient = new PowerAutomateAPIClient();
-                const token = await apiClient.authenticate(config);
-                
-                if (token) {
-                    showAlert('Connection test successful!', 'success');
-                    logger.log('Connection test passed', 'success');
-                } else {
-                    showAlert('Connection test failed - could not authenticate', 'error');
-                    logger.log('Connection test failed', 'error');
-                }
-            } catch (error) {
-                showAlert(`Connection test failed: ${error.message}`, 'error');
-                logger.log('Connection test error', 'error', error);
+            const connection = connectionManager.activeConnection;
+            if (!connection) {
+                showAlert('Please select a connection from Settings first', 'error');
+                closeAuthModal();
+                return;
             }
+
+            logger.log('Proceeding with authentication', 'info', { 
+                option: selectedAuthOption,
+                connection: connection.name 
+            });
+
+            closeAuthModal();
+            await monitor.connectToTenant(connection, selectedAuthOption);
         }
 
-        // Load saved connections
+        // Settings Functions
+        function selectAuthMode(mode) {
+            document.querySelectorAll('.auth-mode-card').forEach(card => {
+                card.classList.remove('active');
+            });
+            event.currentTarget.classList.add('active');
+            authManager.authMode = mode;
+            logger.log('Auth mode selected', 'info', { mode });
+        }
+
         function loadSavedConnections() {
             const container = document.getElementById('savedConnections');
             const connections = connectionManager.connections;
@@ -1784,57 +2007,20 @@
             container.innerHTML = connections.map(conn => `
                 <div class="connection-card" data-id="${conn.id}">
                     <div class="connection-info">
-                        <div class="connection-name">${conn.name}</div>
+                        <div class="connection-name">
+                            ${conn.name}
+                            <span class="connection-tenant">${conn.targetDomain || conn.targetTenantId}</span>
+                        </div>
                         <div class="connection-details">
-                            Environment: ${conn.environmentId || 'Not specified'} • Created ${new Date(conn.createdAt).toLocaleDateString()}
+                            Environment: ${conn.environmentId} • Created ${new Date(conn.createdAt).toLocaleDateString()}
                         </div>
                     </div>
                     <div class="connection-actions">
                         <button class="action-btn use" onclick="useConnection('${conn.id}')">Use</button>
-                        <button class="action-btn edit" onclick="editConnection('${conn.id}')">Edit</button>
                         <button class="action-btn delete" onclick="deleteConnection('${conn.id}')">Delete</button>
                     </div>
                 </div>
             `).join('');
-        }
-
-        // Connection form handling
-        document.getElementById('connectionForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            const connection = {
-                name: document.getElementById('connName').value,
-                environmentId: document.getElementById('connEnvId').value,
-                refreshInterval: parseInt(document.getElementById('connRefreshInterval').value),
-                clientId: document.getElementById('connClientId').value,
-                tenantId: document.getElementById('connTenantId').value,
-                apiVersion: document.getElementById('connApiVersion').value
-            };
-
-            // Validate GUIDs
-            const guidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-            if (!guidPattern.test(connection.clientId)) {
-                showAlert('Client ID must be a valid GUID', 'error');
-                return;
-            }
-            if (!guidPattern.test(connection.tenantId)) {
-                showAlert('Tenant ID must be a valid GUID', 'error');
-                return;
-            }
-            if (!guidPattern.test(connection.environmentId)) {
-                showAlert('Environment ID must be a valid GUID', 'error');
-                return;
-            }
-
-            connectionManager.addConnection(connection);
-            loadSavedConnections();
-            clearConnectionForm();
-            showAlert('Connection saved successfully!', 'success');
-        });
-
-        function clearConnectionForm() {
-            document.getElementById('connectionForm').reset();
-            logger.log('Connection form cleared', 'info');
         }
 
         function useConnection(id) {
@@ -1843,41 +2029,12 @@
                 // Switch to monitor tab
                 document.querySelector('.nav-tab').click();
                 
-                // Apply connection settings
-                monitor.config = {
-                    environmentId: connection.environmentId,
-                    clientId: connection.clientId,
-                    tenantId: connection.tenantId,
-                    refreshInterval: connection.refreshInterval,
-                    apiVersion: connection.apiVersion || '2016-11-01'
-                };
+                showAlert(`Selected connection: ${connection.name}`, 'success');
                 
-                showAlert(`Using connection: ${connection.name}`, 'success');
-                
-                // Auto-connect
+                // Show auth modal to connect
                 setTimeout(() => {
-                    monitor.handleConnect();
+                    monitor.showAuthModal();
                 }, 500);
-            }
-        }
-
-        function editConnection(id) {
-            const connection = connectionManager.getConnection(id);
-            if (connection) {
-                document.getElementById('connName').value = connection.name;
-                document.getElementById('connEnvId').value = connection.environmentId;
-                document.getElementById('connRefreshInterval').value = connection.refreshInterval;
-                document.getElementById('connClientId').value = connection.clientId;
-                document.getElementById('connTenantId').value = connection.tenantId;
-                document.getElementById('connApiVersion').value = connection.apiVersion || '2016-11-01';
-                
-                // Delete the old one (will save as new)
-                connectionManager.deleteConnection(id);
-                loadSavedConnections();
-                
-                // Scroll to form
-                document.getElementById('connectionForm').scrollIntoView({ behavior: 'smooth' });
-                logger.log('Editing connection', 'info', { name: connection.name });
             }
         }
 
@@ -1888,6 +2045,101 @@
                 showAlert('Connection deleted', 'success');
             }
         }
+
+        async function testConnection() {
+            logger.log('Testing connection...', 'info');
+            
+            const config = {
+                targetTenantId: document.getElementById('connTargetTenantId').value,
+                environmentId: document.getElementById('connEnvId').value,
+                clientId: document.getElementById('connClientId').value,
+                connectionType: document.getElementById('connType').value
+            };
+
+            if (!config.targetTenantId || !config.environmentId) {
+                showAlert('Please fill in all required fields', 'error');
+                logger.log('Test failed - missing fields', 'error');
+                return;
+            }
+
+            try {
+                showAlert('Testing connection to tenant...', 'warning');
+                
+                // Try to authenticate to the target tenant
+                await authManager.signInToTenant(config.targetTenantId);
+                
+                showAlert('Connection test successful! You can access this tenant.', 'success');
+                logger.log('Connection test passed', 'success');
+            } catch (error) {
+                showAlert(`Connection test failed: ${error.message}`, 'error');
+                logger.log('Connection test error', 'error', error);
+            }
+        }
+
+        function clearConnectionForm() {
+            document.getElementById('connectionForm').reset();
+            logger.log('Connection form cleared', 'info');
+        }
+
+        // Tab switching
+        function switchTab(tabName) {
+            logger.log(`Switching to ${tabName} tab`, 'info');
+            
+            document.querySelectorAll('.nav-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            event.target.classList.add('active');
+
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+
+            if (tabName === 'monitor') {
+                document.getElementById('monitorTab').classList.add('active');
+            } else if (tabName === 'settings') {
+                document.getElementById('settingsTab').classList.add('active');
+                loadSavedConnections();
+            }
+        }
+
+        // Connection form handling
+        document.getElementById('connectionForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const connection = {
+                name: document.getElementById('connName').value,
+                targetTenantId: document.getElementById('connTargetTenantId').value,
+                targetDomain: document.getElementById('connTargetDomain').value,
+                environmentId: document.getElementById('connEnvId').value,
+                refreshInterval: parseInt(document.getElementById('connRefreshInterval').value),
+                clientId: document.getElementById('connClientId').value,
+                clientSecret: document.getElementById('connClientSecret').value,
+                connectionType: document.getElementById('connType').value
+            };
+
+            // Validate GUIDs
+            const guidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+            
+            if (!guidPattern.test(connection.targetTenantId)) {
+                showAlert('Target Tenant ID must be a valid GUID', 'error');
+                return;
+            }
+            
+            if (!guidPattern.test(connection.environmentId)) {
+                showAlert('Environment ID must be a valid GUID', 'error');
+                return;
+            }
+
+            if (connection.clientId && !guidPattern.test(connection.clientId)) {
+                showAlert('Client ID must be a valid GUID', 'error');
+                return;
+            }
+
+            connectionManager.addConnection(connection);
+            loadSavedConnections();
+            clearConnectionForm();
+            showAlert('Connection saved successfully!', 'success');
+        });
 
         // Alert helper
         function showAlert(message, type = 'info') {
@@ -1914,21 +2166,19 @@
         }
 
         // Initialize monitor
-        const monitor = new PowerAutomateMonitor();
+        const monitor = new MultiTenantPowerAutomateMonitor();
 
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', function() {
-            logger.log('Application initialized', 'success');
-            logger.log('Diagnostics console ready - all operations will be logged here', 'info');
+            logger.log('Multi-Tenant Power Automate Monitor initialized', 'success');
+            logger.log('This app can connect to different Azure tenants', 'info');
+            logger.log('Press Ctrl+D to toggle diagnostics panel', 'info');
             
             // Show diagnostics panel by default
             logger.show();
             
-            // Check if there's a default connection
-            if (connectionManager.connections.length > 0 && !connectionManager.activeConnection) {
-                connectionManager.setActiveConnection(connectionManager.connections[0].id);
-                logger.log('Default connection loaded', 'info', { name: connectionManager.connections[0].name });
-            }
+            // Load saved connections
+            loadSavedConnections();
 
             // Add keyboard shortcut for diagnostics (Ctrl+D)
             document.addEventListener('keydown', (e) => {
@@ -1938,7 +2188,12 @@
                 }
             });
 
-            logger.log('Press Ctrl+D to toggle diagnostics panel', 'info');
+            // Important setup instructions
+            logger.log('SETUP REQUIRED:', 'warning');
+            logger.log('1. Register a multi-tenant app in Azure AD', 'warning');
+            logger.log('2. Update YOUR_MULTI_TENANT_APP_CLIENT_ID in the code', 'warning');
+            logger.log('3. Configure API permissions for Power Automate/Graph', 'warning');
+            logger.log('4. Grant admin consent in target tenants', 'warning');
         });
     </script>
 </body>
