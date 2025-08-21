@@ -1713,4 +1713,233 @@
                     status.textContent = 'Disconnected';
                     refreshBtn.disabled = true;
                     exportBtn.disabled = true;
-                    search
+                    searchBox.disabled = true;
+                    connectBtn.textContent = '🔌 Connect to Power Platform';
+                    this.stopAutoRefresh();
+                }
+            }
+
+            startAutoRefresh() {
+                this.stopAutoRefresh();
+                const interval = this.config.refreshInterval * 1000;
+                logger.log(`Starting auto-refresh every ${this.config.refreshInterval} seconds`, 'info');
+                this.refreshTimer = setInterval(() => {
+                    this.refreshData();
+                }, interval);
+            }
+
+            stopAutoRefresh() {
+                if (this.refreshTimer) {
+                    clearInterval(this.refreshTimer);
+                    this.refreshTimer = null;
+                    logger.log('Auto-refresh stopped', 'info');
+                }
+            }
+        }
+
+        // Test Connection Function
+        async function testConnection() {
+            logger.log('Testing connection...', 'info');
+            
+            const config = {
+                environmentId: document.getElementById('connEnvId').value,
+                clientId: document.getElementById('connClientId').value,
+                tenantId: document.getElementById('connTenantId').value,
+                apiVersion: document.getElementById('connApiVersion').value
+            };
+
+            if (!config.environmentId || !config.clientId || !config.tenantId) {
+                showAlert('Please fill in all required fields', 'error');
+                logger.log('Test failed - missing fields', 'error');
+                return;
+            }
+
+            try {
+                const apiClient = new PowerAutomateAPIClient();
+                const token = await apiClient.authenticate(config);
+                
+                if (token) {
+                    showAlert('Connection test successful!', 'success');
+                    logger.log('Connection test passed', 'success');
+                } else {
+                    showAlert('Connection test failed - could not authenticate', 'error');
+                    logger.log('Connection test failed', 'error');
+                }
+            } catch (error) {
+                showAlert(`Connection test failed: ${error.message}`, 'error');
+                logger.log('Connection test error', 'error', error);
+            }
+        }
+
+        // Load saved connections
+        function loadSavedConnections() {
+            const container = document.getElementById('savedConnections');
+            const connections = connectionManager.connections;
+
+            if (connections.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: #6b7280;">No saved connections yet. Add your first connection below.</p>';
+                return;
+            }
+
+            container.innerHTML = connections.map(conn => `
+                <div class="connection-card" data-id="${conn.id}">
+                    <div class="connection-info">
+                        <div class="connection-name">${conn.name}</div>
+                        <div class="connection-details">
+                            Environment: ${conn.environmentId || 'Not specified'} • Created ${new Date(conn.createdAt).toLocaleDateString()}
+                        </div>
+                    </div>
+                    <div class="connection-actions">
+                        <button class="action-btn use" onclick="useConnection('${conn.id}')">Use</button>
+                        <button class="action-btn edit" onclick="editConnection('${conn.id}')">Edit</button>
+                        <button class="action-btn delete" onclick="deleteConnection('${conn.id}')">Delete</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Connection form handling
+        document.getElementById('connectionForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const connection = {
+                name: document.getElementById('connName').value,
+                environmentId: document.getElementById('connEnvId').value,
+                refreshInterval: parseInt(document.getElementById('connRefreshInterval').value),
+                clientId: document.getElementById('connClientId').value,
+                tenantId: document.getElementById('connTenantId').value,
+                apiVersion: document.getElementById('connApiVersion').value
+            };
+
+            // Validate GUIDs
+            const guidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+            if (!guidPattern.test(connection.clientId)) {
+                showAlert('Client ID must be a valid GUID', 'error');
+                return;
+            }
+            if (!guidPattern.test(connection.tenantId)) {
+                showAlert('Tenant ID must be a valid GUID', 'error');
+                return;
+            }
+            if (!guidPattern.test(connection.environmentId)) {
+                showAlert('Environment ID must be a valid GUID', 'error');
+                return;
+            }
+
+            connectionManager.addConnection(connection);
+            loadSavedConnections();
+            clearConnectionForm();
+            showAlert('Connection saved successfully!', 'success');
+        });
+
+        function clearConnectionForm() {
+            document.getElementById('connectionForm').reset();
+            logger.log('Connection form cleared', 'info');
+        }
+
+        function useConnection(id) {
+            const connection = connectionManager.setActiveConnection(id);
+            if (connection) {
+                // Switch to monitor tab
+                document.querySelector('.nav-tab').click();
+                
+                // Apply connection settings
+                monitor.config = {
+                    environmentId: connection.environmentId,
+                    clientId: connection.clientId,
+                    tenantId: connection.tenantId,
+                    refreshInterval: connection.refreshInterval,
+                    apiVersion: connection.apiVersion || '2016-11-01'
+                };
+                
+                showAlert(`Using connection: ${connection.name}`, 'success');
+                
+                // Auto-connect
+                setTimeout(() => {
+                    monitor.handleConnect();
+                }, 500);
+            }
+        }
+
+        function editConnection(id) {
+            const connection = connectionManager.getConnection(id);
+            if (connection) {
+                document.getElementById('connName').value = connection.name;
+                document.getElementById('connEnvId').value = connection.environmentId;
+                document.getElementById('connRefreshInterval').value = connection.refreshInterval;
+                document.getElementById('connClientId').value = connection.clientId;
+                document.getElementById('connTenantId').value = connection.tenantId;
+                document.getElementById('connApiVersion').value = connection.apiVersion || '2016-11-01';
+                
+                // Delete the old one (will save as new)
+                connectionManager.deleteConnection(id);
+                loadSavedConnections();
+                
+                // Scroll to form
+                document.getElementById('connectionForm').scrollIntoView({ behavior: 'smooth' });
+                logger.log('Editing connection', 'info', { name: connection.name });
+            }
+        }
+
+        function deleteConnection(id) {
+            if (confirm('Are you sure you want to delete this connection?')) {
+                connectionManager.deleteConnection(id);
+                loadSavedConnections();
+                showAlert('Connection deleted', 'success');
+            }
+        }
+
+        // Alert helper
+        function showAlert(message, type = 'info') {
+            const banner = document.getElementById('alertBanner');
+            const alertMessage = document.getElementById('alertMessage');
+            const alertIcon = document.getElementById('alertIcon');
+
+            alertMessage.textContent = message;
+            banner.className = `alert-banner show ${type}`;
+            
+            const icons = {
+                success: '✅',
+                error: '❌',
+                warning: '⚠️',
+                info: 'ℹ️'
+            };
+            alertIcon.textContent = icons[type] || icons.info;
+
+            logger.log(`Alert: ${message}`, type);
+
+            setTimeout(() => {
+                banner.classList.remove('show');
+            }, 5000);
+        }
+
+        // Initialize monitor
+        const monitor = new PowerAutomateMonitor();
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            logger.log('Application initialized', 'success');
+            logger.log('Diagnostics console ready - all operations will be logged here', 'info');
+            
+            // Show diagnostics panel by default
+            logger.show();
+            
+            // Check if there's a default connection
+            if (connectionManager.connections.length > 0 && !connectionManager.activeConnection) {
+                connectionManager.setActiveConnection(connectionManager.connections[0].id);
+                logger.log('Default connection loaded', 'info', { name: connectionManager.connections[0].name });
+            }
+
+            // Add keyboard shortcut for diagnostics (Ctrl+D)
+            document.addEventListener('keydown', (e) => {
+                if (e.ctrlKey && e.key === 'd') {
+                    e.preventDefault();
+                    logger.panel.classList.toggle('hidden');
+                }
+            });
+
+            logger.log('Press Ctrl+D to toggle diagnostics panel', 'info');
+        });
+    </script>
+</body>
+</html>
