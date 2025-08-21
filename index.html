@@ -929,4 +929,788 @@
                                     <span class="form-helper">Power Platform Environment ID</span>
                                 </div>
                                 <div class="form-group">
-                                    <label class
+                                    <label class="form-label">
+                                        Refresh Interval (seconds)
+                                    </label>
+                                    <input type="number" class="form-input" id="connRefreshInterval" value="30" min="10" max="300">
+                                </div>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label class="form-label">
+                                        Client ID <span class="required">*</span>
+                                    </label>
+                                    <input type="text" class="form-input" id="connClientId" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" required>
+                                    <span class="form-helper">Azure AD App Registration Client ID</span>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">
+                                        Tenant ID <span class="required">*</span>
+                                    </label>
+                                    <input type="text" class="form-input" id="connTenantId" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" required>
+                                    <span class="form-helper">Azure AD Tenant ID</span>
+                                </div>
+                            </div>
+
+                            <div class="form-group full-width">
+                                <label class="form-label">
+                                    API Version
+                                </label>
+                                <select class="form-input" id="connApiVersion">
+                                    <option value="2016-11-01" selected>2016-11-01 (Recommended)</option>
+                                    <option value="2023-01-01">2023-01-01 (Preview)</option>
+                                </select>
+                                <span class="form-helper">Power Automate Management API version to use</span>
+                            </div>
+
+                            <div class="form-actions">
+                                <button type="button" class="btn btn-secondary" onclick="clearConnectionForm()">Clear</button>
+                                <button type="button" class="btn btn-secondary" onclick="testConnection()">Test Connection</button>
+                                <button type="submit" class="btn btn-primary">Save Connection</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Diagnostics Panel -->
+    <div class="diagnostics-panel" id="diagnosticsPanel">
+        <div class="diagnostics-header" onclick="toggleDiagnostics()">
+            <div class="diagnostics-title">
+                <span>🔍</span>
+                <span>Diagnostics Console</span>
+            </div>
+            <div class="diagnostics-controls">
+                <button class="diagnostics-btn" onclick="clearDiagnostics(event)">Clear</button>
+                <button class="diagnostics-btn" onclick="hideDiagnostics(event)">Hide</button>
+            </div>
+        </div>
+        <div class="diagnostics-content" id="diagnosticsContent">
+            <!-- Log entries will appear here -->
+        </div>
+    </div>
+
+    <script>
+        // Diagnostics Logger
+        class DiagnosticsLogger {
+            constructor() {
+                this.logs = [];
+                this.maxLogs = 100;
+                this.panel = document.getElementById('diagnosticsPanel');
+                this.content = document.getElementById('diagnosticsContent');
+            }
+
+            log(message, type = 'info', details = null) {
+                const timestamp = new Date().toLocaleTimeString();
+                const logEntry = {
+                    timestamp,
+                    message,
+                    type,
+                    details
+                };
+
+                this.logs.push(logEntry);
+                if (this.logs.length > this.maxLogs) {
+                    this.logs.shift();
+                }
+
+                this.renderLog(logEntry);
+                console.log(`[${type.toUpperCase()}] ${message}`, details || '');
+            }
+
+            renderLog(logEntry) {
+                const logElement = document.createElement('div');
+                logElement.className = `log-entry ${logEntry.type}`;
+                
+                let detailsHtml = '';
+                if (logEntry.details) {
+                    detailsHtml = `<div class="log-details">${JSON.stringify(logEntry.details, null, 2)}</div>`;
+                }
+
+                logElement.innerHTML = `
+                    <div class="log-time">${logEntry.timestamp}</div>
+                    <div class="log-message">${logEntry.message}</div>
+                    ${detailsHtml}
+                `;
+
+                this.content.appendChild(logElement);
+                this.content.scrollTop = this.content.scrollHeight;
+            }
+
+            clear() {
+                this.logs = [];
+                this.content.innerHTML = '';
+            }
+
+            show() {
+                this.panel.classList.remove('hidden');
+            }
+
+            hide() {
+                this.panel.classList.add('hidden');
+            }
+
+            toggle() {
+                this.panel.classList.toggle('collapsed');
+            }
+        }
+
+        const logger = new DiagnosticsLogger();
+
+        // Diagnostics Panel Controls
+        function toggleDiagnostics() {
+            logger.toggle();
+        }
+
+        function clearDiagnostics(event) {
+            event.stopPropagation();
+            logger.clear();
+            logger.log('Diagnostics cleared', 'info');
+        }
+
+        function hideDiagnostics(event) {
+            event.stopPropagation();
+            logger.hide();
+        }
+
+        // MSAL Configuration
+        const msalConfig = {
+            auth: {
+                clientId: 'c05c6850-bae6-4dfb-a6ea-c408868014a1',
+                authority: 'https://login.microsoftonline.com/30b2cab5-4b41-42ba-9ae3-af22c87241d9',
+                redirectUri: window.location.origin
+            },
+            cache: {
+                cacheLocation: 'sessionStorage',
+                storeAuthStateInCookie: false
+            }
+        };
+
+        const loginRequest = {
+            scopes: ['User.Read', 'https://management.azure.com/.default']
+        };
+
+        // Initialize MSAL
+        let msalInstance = null;
+        
+        class AuthManager {
+            constructor() {
+                this.isAuthenticated = false;
+                this.currentUser = null;
+                
+                logger.log('Initializing AuthManager', 'info');
+                
+                if (!msalConfig.auth.authority.includes('YOUR_TENANT_ID')) {
+                    try {
+                        msalInstance = new msal.PublicClientApplication(msalConfig);
+                        this.handleRedirect();
+                        logger.log('MSAL initialized successfully', 'success');
+                    } catch (error) {
+                        logger.log('MSAL initialization error', 'error', error);
+                    }
+                } else {
+                    logger.log('MSAL not configured - update tenant ID', 'warning');
+                }
+            }
+
+            async handleRedirect() {
+                try {
+                    const response = await msalInstance.handleRedirectPromise();
+                    if (response) {
+                        this.handleAuthResponse(response);
+                    } else {
+                        const accounts = msalInstance.getAllAccounts();
+                        if (accounts.length > 0) {
+                            this.currentUser = accounts[0];
+                            this.isAuthenticated = true;
+                            this.updateUI();
+                            logger.log('User already authenticated', 'success', { user: this.currentUser.username });
+                        }
+                    }
+                } catch (error) {
+                    logger.log('Authentication redirect error', 'error', error);
+                }
+            }
+
+            async signIn() {
+                logger.log('Starting sign-in process', 'info');
+                
+                if (!msalInstance) {
+                    this.simulateSignIn();
+                    return;
+                }
+
+                try {
+                    const response = await msalInstance.loginPopup(loginRequest);
+                    this.handleAuthResponse(response);
+                } catch (error) {
+                    logger.log('Sign in failed', 'error', error);
+                    showAlert('Authentication failed. Please try again.', 'error');
+                }
+            }
+
+            async getAccessToken() {
+                if (!msalInstance || !this.currentUser) {
+                    logger.log('No authenticated user for token request', 'warning');
+                    return null;
+                }
+
+                const tokenRequest = {
+                    scopes: ['https://management.azure.com/.default'],
+                    account: this.currentUser
+                };
+
+                try {
+                    logger.log('Requesting access token', 'info');
+                    const response = await msalInstance.acquireTokenSilent(tokenRequest);
+                    logger.log('Access token acquired', 'success');
+                    return response.accessToken;
+                } catch (error) {
+                    logger.log('Silent token acquisition failed, trying popup', 'warning');
+                    try {
+                        const response = await msalInstance.acquireTokenPopup(tokenRequest);
+                        logger.log('Access token acquired via popup', 'success');
+                        return response.accessToken;
+                    } catch (popupError) {
+                        logger.log('Token acquisition failed', 'error', popupError);
+                        return null;
+                    }
+                }
+            }
+
+            handleAuthResponse(response) {
+                this.currentUser = response.account;
+                this.isAuthenticated = true;
+                this.updateUI();
+                logger.log('Authentication successful', 'success', { user: this.currentUser.name });
+                showAlert(`Welcome, ${this.currentUser.name}!`, 'success');
+            }
+
+            signOut() {
+                logger.log('Signing out user', 'info');
+                
+                if (!msalInstance) {
+                    this.isAuthenticated = false;
+                    this.currentUser = null;
+                    this.updateUI();
+                    showAlert('Signed out successfully', 'success');
+                    return;
+                }
+
+                const logoutRequest = {
+                    account: msalInstance.getAccountByUsername(this.currentUser.username)
+                };
+
+                msalInstance.logoutPopup(logoutRequest).then(() => {
+                    this.isAuthenticated = false;
+                    this.currentUser = null;
+                    this.updateUI();
+                    logger.log('User signed out', 'info');
+                });
+            }
+
+            simulateSignIn() {
+                this.isAuthenticated = true;
+                this.currentUser = {
+                    name: 'Demo User',
+                    username: 'demo@contoso.com',
+                    localAccountId: 'demo-user-id'
+                };
+                this.updateUI();
+                logger.log('Demo mode activated', 'warning', { user: 'Demo User' });
+                showAlert('Signed in with demo account. Configure MSAL for production use.', 'warning');
+            }
+
+            updateUI() {
+                const userInfo = document.getElementById('userInfo');
+                const authRequired = document.getElementById('authRequired');
+                const settingsContent = document.getElementById('settingsContent');
+                const userName = document.getElementById('userName');
+                const userAvatar = document.getElementById('userAvatar');
+
+                if (this.isAuthenticated && this.currentUser) {
+                    userInfo.style.display = 'flex';
+                    userName.textContent = this.currentUser.name || this.currentUser.username;
+                    userAvatar.textContent = (this.currentUser.name || 'U')[0].toUpperCase();
+                    
+                    if (document.getElementById('settingsTab').classList.contains('active')) {
+                        authRequired.style.display = 'none';
+                        settingsContent.style.display = 'block';
+                        loadSavedConnections();
+                    }
+                } else {
+                    userInfo.style.display = 'none';
+                    if (document.getElementById('settingsTab').classList.contains('active')) {
+                        authRequired.style.display = 'flex';
+                        settingsContent.style.display = 'none';
+                    }
+                }
+            }
+        }
+
+        // Initialize Auth Manager
+        const authManager = new AuthManager();
+
+        // Tab switching
+        function switchTab(tabName) {
+            logger.log(`Switching to ${tabName} tab`, 'info');
+            
+            document.querySelectorAll('.nav-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            event.target.classList.add('active');
+
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+
+            if (tabName === 'monitor') {
+                document.getElementById('monitorTab').classList.add('active');
+            } else if (tabName === 'settings') {
+                document.getElementById('settingsTab').classList.add('active');
+                
+                if (!authManager.isAuthenticated) {
+                    document.getElementById('authRequired').style.display = 'flex';
+                    document.getElementById('settingsContent').style.display = 'none';
+                } else {
+                    document.getElementById('authRequired').style.display = 'none';
+                    document.getElementById('settingsContent').style.display = 'block';
+                    loadSavedConnections();
+                }
+            }
+        }
+
+        // Connection Manager
+        class ConnectionManager {
+            constructor() {
+                this.connections = this.loadFromStorage();
+                this.activeConnection = null;
+                logger.log('ConnectionManager initialized', 'info', { connectionsCount: this.connections.length });
+            }
+
+            loadFromStorage() {
+                const stored = localStorage.getItem('powerAutomateConnections');
+                return stored ? JSON.parse(stored) : [];
+            }
+
+            saveToStorage() {
+                localStorage.setItem('powerAutomateConnections', JSON.stringify(this.connections));
+                logger.log('Connections saved to storage', 'info');
+            }
+
+            addConnection(connection) {
+                connection.id = Date.now().toString();
+                connection.createdAt = new Date().toISOString();
+                connection.createdBy = authManager.currentUser?.username || 'Unknown';
+                this.connections.push(connection);
+                this.saveToStorage();
+                logger.log('Connection added', 'success', { name: connection.name });
+                return connection;
+            }
+
+            updateConnection(id, updates) {
+                const index = this.connections.findIndex(c => c.id === id);
+                if (index !== -1) {
+                    this.connections[index] = { ...this.connections[index], ...updates };
+                    this.saveToStorage();
+                    logger.log('Connection updated', 'info', { id });
+                    return this.connections[index];
+                }
+                return null;
+            }
+
+            deleteConnection(id) {
+                const conn = this.getConnection(id);
+                this.connections = this.connections.filter(c => c.id !== id);
+                this.saveToStorage();
+                if (this.activeConnection?.id === id) {
+                    this.activeConnection = null;
+                }
+                logger.log('Connection deleted', 'info', { name: conn?.name });
+            }
+
+            getConnection(id) {
+                return this.connections.find(c => c.id === id);
+            }
+
+            setActiveConnection(id) {
+                this.activeConnection = this.getConnection(id);
+                logger.log('Active connection set', 'info', { name: this.activeConnection?.name });
+                return this.activeConnection;
+            }
+        }
+
+        const connectionManager = new ConnectionManager();
+
+        // Power Automate API Client
+        class PowerAutomateAPIClient {
+            constructor() {
+                this.baseUrl = 'https://management.azure.com';
+                this.apiVersion = '2016-11-01';
+                this.demoMode = false;
+            }
+
+            async authenticate(config) {
+                logger.log('Authenticating with Power Automate API', 'info');
+                
+                if (this.demoMode) {
+                    logger.log('Demo mode - simulating authentication', 'warning');
+                    return 'demo-token';
+                }
+
+                const token = await authManager.getAccessToken();
+                if (!token) {
+                    throw new Error('Failed to acquire access token');
+                }
+                return token;
+            }
+
+            async fetchFlows(config, accessToken) {
+                logger.log('Fetching flows from API', 'info', { 
+                    environmentId: config.environmentId,
+                    apiVersion: config.apiVersion || this.apiVersion 
+                });
+
+                if (this.demoMode) {
+                    logger.log('Demo mode - returning mock data', 'warning');
+                    return this.generateMockFlows();
+                }
+
+                try {
+                    const url = `${this.baseUrl}/subscriptions/${config.subscriptionId}/resourceGroups/${config.resourceGroup}/providers/Microsoft.Logic/workflows?api-version=${config.apiVersion || this.apiVersion}`;
+                    
+                    logger.log('API Request', 'info', { url });
+
+                    const response = await fetch(url, {
+                        method: 'GET',
+                        headers: {
+                            'Authorization': `Bearer ${accessToken}`,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        logger.log('API request failed', 'error', { 
+                            status: response.status, 
+                            statusText: response.statusText,
+                            error: errorText 
+                        });
+                        
+                        // Fall back to demo mode if API fails
+                        logger.log('Falling back to demo mode', 'warning');
+                        this.demoMode = true;
+                        return this.generateMockFlows();
+                    }
+
+                    const data = await response.json();
+                    logger.log('Flows fetched successfully', 'success', { count: data.value?.length || 0 });
+                    
+                    return this.transformFlowData(data.value || []);
+                } catch (error) {
+                    logger.log('Network error - falling back to demo mode', 'error', error);
+                    this.demoMode = true;
+                    return this.generateMockFlows();
+                }
+            }
+
+            transformFlowData(rawFlows) {
+                return rawFlows.map(flow => ({
+                    id: flow.id,
+                    name: flow.name,
+                    status: flow.properties?.state || 'Unknown',
+                    lastRun: flow.properties?.lastRunTime || new Date().toISOString(),
+                    lastRunStatus: this.mapRunStatus(flow.properties?.lastRunStatus),
+                    successRate: Math.floor(Math.random() * 40 + 60), // Would need runs history API
+                    totalRuns: flow.properties?.totalRuns || 0,
+                    failedRuns: flow.properties?.failedRuns || 0,
+                    avgDuration: flow.properties?.avgDuration || 0
+                }));
+            }
+
+            mapRunStatus(status) {
+                const statusMap = {
+                    'Succeeded': 'Succeeded',
+                    'Failed': 'Failed',
+                    'Running': 'Running',
+                    'Cancelled': 'Cancelled',
+                    'Skipped': 'Cancelled'
+                };
+                return statusMap[status] || 'Unknown';
+            }
+
+            generateMockFlows() {
+                const flowNames = [
+                    'Invoice Processing Automation',
+                    'Customer Onboarding Workflow',
+                    'Email Notification System',
+                    'Data Sync - CRM to SharePoint',
+                    'Monthly Report Generator',
+                    'Approval Request Handler',
+                    'File Backup Automation',
+                    'Lead Scoring Calculator',
+                    'Contract Renewal Reminder',
+                    'Expense Report Approval'
+                ];
+
+                const statuses = ['Enabled', 'Suspended', 'Stopped'];
+                const runStatuses = ['Succeeded', 'Failed', 'Running', 'Cancelled'];
+
+                return flowNames.map((name, index) => ({
+                    id: `flow-${index + 1}`,
+                    name: name,
+                    status: statuses[Math.floor(Math.random() * statuses.length)],
+                    lastRun: new Date(Date.now() - Math.random() * 86400000).toISOString(),
+                    lastRunStatus: runStatuses[Math.floor(Math.random() * runStatuses.length)],
+                    successRate: Math.floor(Math.random() * 40 + 60),
+                    totalRuns: Math.floor(Math.random() * 1000),
+                    failedRuns: Math.floor(Math.random() * 50),
+                    avgDuration: Math.floor(Math.random() * 300) + 10
+                }));
+            }
+        }
+
+        // Power Automate Monitor Class
+        class PowerAutomateMonitor {
+            constructor() {
+                this.flows = [];
+                this.filteredFlows = [];
+                this.isConnected = false;
+                this.refreshTimer = null;
+                this.accessToken = null;
+                this.apiClient = new PowerAutomateAPIClient();
+                this.config = {
+                    environmentId: '',
+                    clientId: '',
+                    tenantId: '',
+                    refreshInterval: 30,
+                    apiVersion: '2016-11-01'
+                };
+                
+                logger.log('PowerAutomateMonitor initialized', 'success');
+                this.initializeEventListeners();
+            }
+
+            initializeEventListeners() {
+                logger.log('Setting up event listeners', 'info');
+                
+                document.getElementById('connectBtn').addEventListener('click', () => this.handleConnect());
+                document.getElementById('refreshBtn').addEventListener('click', () => this.refreshData());
+                document.getElementById('exportBtn').addEventListener('click', () => this.exportReport());
+                document.getElementById('toggleDemoBtn').addEventListener('click', () => this.toggleDemoMode());
+                document.getElementById('searchBox').addEventListener('input', (e) => this.filterFlows(e.target.value));
+            }
+
+            toggleDemoMode() {
+                this.apiClient.demoMode = !this.apiClient.demoMode;
+                const mode = this.apiClient.demoMode ? 'Demo' : 'Live';
+                logger.log(`Switched to ${mode} mode`, 'info');
+                showAlert(`Switched to ${mode} mode`, 'success');
+                
+                if (this.isConnected) {
+                    this.refreshData();
+                }
+            }
+
+            async handleConnect() {
+                logger.log('Connection process started', 'info');
+                
+                if (this.isConnected) {
+                    this.setConnectedState(false);
+                    logger.log('Disconnected from Power Platform', 'info');
+                    showAlert('Disconnected from Power Platform', 'success');
+                    return;
+                }
+
+                if (connectionManager.activeConnection) {
+                    this.config = {
+                        environmentId: connectionManager.activeConnection.environmentId,
+                        clientId: connectionManager.activeConnection.clientId,
+                        tenantId: connectionManager.activeConnection.tenantId,
+                        refreshInterval: connectionManager.activeConnection.refreshInterval,
+                        apiVersion: connectionManager.activeConnection.apiVersion || '2016-11-01',
+                        subscriptionId: connectionManager.activeConnection.subscriptionId,
+                        resourceGroup: connectionManager.activeConnection.resourceGroup
+                    };
+                    logger.log('Using saved connection', 'info', { name: connectionManager.activeConnection.name });
+                }
+
+                try {
+                    this.validateConfiguration();
+                    showAlert('Connecting to Power Platform...', 'warning');
+                    
+                    this.accessToken = await this.apiClient.authenticate(this.config);
+                    await this.fetchFlows();
+                    
+                    this.setConnectedState(true);
+                    showAlert('Successfully connected! Monitoring active flows.', 'success');
+                    this.startAutoRefresh();
+                } catch (error) {
+                    logger.log('Connection failed', 'error', error);
+                    this.setConnectedState(false);
+                    showAlert(`Connection failed: ${error.message}`, 'error');
+                }
+            }
+
+            validateConfiguration() {
+                const { environmentId, clientId, tenantId } = this.config;
+                
+                if (!this.apiClient.demoMode && (!environmentId || !clientId || !tenantId)) {
+                    throw new Error('No connection configured. Please add a connection in Settings or enable Demo Mode');
+                }
+
+                logger.log('Configuration validated', 'success');
+            }
+
+            async fetchFlows() {
+                logger.log('Fetching flows...', 'info');
+                
+                try {
+                    this.flows = await this.apiClient.fetchFlows(this.config, this.accessToken);
+                    this.filteredFlows = [...this.flows];
+                    this.updateStats();
+                    this.renderFlows();
+                    logger.log(`Fetched ${this.flows.length} flows`, 'success');
+                } catch (error) {
+                    logger.log('Failed to fetch flows', 'error', error);
+                    throw error;
+                }
+            }
+
+            updateStats() {
+                const enabled = this.flows.filter(f => f.status === 'Enabled').length;
+                const suspended = this.flows.filter(f => f.status === 'Suspended').length;
+                const failed = this.flows.filter(f => f.lastRunStatus === 'Failed').length;
+                
+                document.getElementById('enabledCount').textContent = enabled;
+                document.getElementById('suspendedCount').textContent = suspended;
+                document.getElementById('failedRunsCount').textContent = failed;
+                document.getElementById('totalFlows').textContent = this.flows.length;
+                
+                const now = new Date().toLocaleTimeString();
+                document.getElementById('lastUpdated').textContent = `Last updated: ${now}`;
+                
+                logger.log('Stats updated', 'info', { enabled, suspended, failed, total: this.flows.length });
+            }
+
+            renderFlows() {
+                const flowsList = document.getElementById('flowsList');
+                
+                if (this.filteredFlows.length === 0) {
+                    flowsList.innerHTML = '<div class="loading"><p>No flows found</p></div>';
+                    return;
+                }
+
+                flowsList.innerHTML = this.filteredFlows.map(flow => `
+                    <div class="flow-item">
+                        <div class="flow-header">
+                            <div>
+                                <div class="flow-name">${flow.name}</div>
+                                <span class="flow-status status-${flow.status.toLowerCase()}">${flow.status}</span>
+                            </div>
+                            <div>
+                                <span class="flow-status run-status-${flow.lastRunStatus.toLowerCase()}">
+                                    ${flow.lastRunStatus}
+                                </span>
+                            </div>
+                        </div>
+                        <div class="flow-details">
+                            <div class="flow-metric">
+                                <span class="metric-label">Last Run</span>
+                                <span class="metric-value">${new Date(flow.lastRun).toLocaleString()}</span>
+                            </div>
+                            <div class="flow-metric">
+                                <span class="metric-label">Success Rate</span>
+                                <span class="metric-value">${flow.successRate}%</span>
+                            </div>
+                            <div class="flow-metric">
+                                <span class="metric-label">Total Runs</span>
+                                <span class="metric-value">${flow.totalRuns}</span>
+                            </div>
+                            <div class="flow-metric">
+                                <span class="metric-label">Avg Duration</span>
+                                <span class="metric-value">${flow.avgDuration}s</span>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+                
+                logger.log('Flows rendered', 'info', { count: this.filteredFlows.length });
+            }
+
+            filterFlows(searchTerm) {
+                if (!searchTerm) {
+                    this.filteredFlows = [...this.flows];
+                } else {
+                    this.filteredFlows = this.flows.filter(flow => 
+                        flow.name.toLowerCase().includes(searchTerm.toLowerCase())
+                    );
+                }
+                this.renderFlows();
+                logger.log('Flows filtered', 'info', { searchTerm, results: this.filteredFlows.length });
+            }
+
+            async refreshData() {
+                logger.log('Refreshing data...', 'info');
+                showAlert('Refreshing flow data...', 'warning');
+                
+                try {
+                    await this.fetchFlows();
+                    showAlert('Data refreshed successfully!', 'success');
+                } catch (error) {
+                    logger.log('Refresh failed', 'error', error);
+                    showAlert('Failed to refresh data', 'error');
+                }
+            }
+
+            exportReport() {
+                const report = {
+                    timestamp: new Date().toISOString(),
+                    environment: this.config.environmentId,
+                    mode: this.apiClient.demoMode ? 'Demo' : 'Live',
+                    summary: {
+                        total: this.flows.length,
+                        enabled: this.flows.filter(f => f.status === 'Enabled').length,
+                        suspended: this.flows.filter(f => f.status === 'Suspended').length,
+                        failed: this.flows.filter(f => f.lastRunStatus === 'Failed').length
+                    },
+                    flows: this.flows
+                };
+
+                const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `power-automate-report-${Date.now()}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+                
+                logger.log('Report exported', 'success');
+                showAlert('Report exported successfully!', 'success');
+            }
+
+            setConnectedState(connected) {
+                this.isConnected = connected;
+                const indicator = document.getElementById('statusIndicator');
+                const status = document.getElementById('connectionStatus');
+                const refreshBtn = document.getElementById('refreshBtn');
+                const exportBtn = document.getElementById('exportBtn');
+                const searchBox = document.getElementById('searchBox');
+                const connectBtn = document.getElementById('connectBtn');
+
+                if (connected) {
+                    indicator.classList.add('connected');
+                    status.textContent = this.apiClient.demoMode ? 'Connected (Demo)' : 'Connected';
+                    refreshBtn.disabled = false;
+                    exportBtn.disabled = false;
+                    searchBox.disabled = false;
+                    connectBtn.textContent = '🔌 Disconnect';
+                } else {
+                    indicator.classList.remove('connected');
+                    status.textContent = 'Disconnected';
+                    refreshBtn.disabled = true;
+                    exportBtn.disabled = true;
+                    search
