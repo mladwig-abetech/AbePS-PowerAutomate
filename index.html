@@ -1346,20 +1346,23 @@
                 return this.msalInstances.get(tenantId);
             }
 
-            // Sign in to specific tenant
+            // FIXED: Sign in to specific tenant with separated scopes
             async signInToTenant(tenantId, usePopup = true) {
                 logger.log('Signing in to tenant', 'info', { tenantId });
                 
                 try {
                     const msalInstance = this.getMsalInstance(tenantId);
                     
+                    // Use only Microsoft Graph scopes for initial login
                     const loginRequest = {
                         scopes: [
                             'User.Read',
-                            'https://management.azure.com/.default'
+                            'openid',
+                            'profile',
+                            'offline_access'
                         ],
                         extraQueryParameters: {
-                            domain_hint: tenantId // Help direct to right tenant
+                            domain_hint: tenantId
                         }
                     };
 
@@ -1368,7 +1371,7 @@
                         response = await msalInstance.loginPopup(loginRequest);
                     } else {
                         await msalInstance.loginRedirect(loginRequest);
-                        return; // Redirect will navigate away
+                        return;
                     }
 
                     if (response) {
@@ -1388,9 +1391,9 @@
                 }
             }
 
-            // Get access token for specific tenant
-            async getAccessTokenForTenant(tenantId, scopes = ['https://management.azure.com/.default']) {
-                logger.log('Requesting access token for tenant', 'info', { tenantId });
+            // FIXED: Get access token for specific tenant with API-specific scopes
+            async getAccessTokenForTenant(tenantId, apiType = 'powerautomate') {
+                logger.log('Requesting access token for tenant', 'info', { tenantId, apiType });
                 
                 try {
                     const msalInstance = this.getMsalInstance(tenantId);
@@ -1402,6 +1405,22 @@
                         return null;
                     }
 
+                    // Define scopes based on API type
+                    let scopes;
+                    switch (apiType) {
+                        case 'graph':
+                            scopes = ['https://graph.microsoft.com/.default'];
+                            break;
+                        case 'management':
+                            scopes = ['https://management.azure.com/.default'];
+                            break;
+                        case 'powerautomate':
+                        default:
+                            // Power Automate uses different scopes
+                            scopes = ['https://service.flow.microsoft.com/.default'];
+                            break;
+                    }
+
                     const tokenRequest = {
                         scopes: scopes,
                         account: accounts[0]
@@ -1409,12 +1428,12 @@
 
                     try {
                         const response = await msalInstance.acquireTokenSilent(tokenRequest);
-                        logger.log('Token acquired silently', 'success');
+                        logger.log('Token acquired silently', 'success', { apiType });
                         return response.accessToken;
                     } catch (silentError) {
                         logger.log('Silent token acquisition failed, trying popup', 'warning');
                         const response = await msalInstance.acquireTokenPopup(tokenRequest);
-                        logger.log('Token acquired via popup', 'success');
+                        logger.log('Token acquired via popup', 'success', { apiType });
                         return response.accessToken;
                     }
                 } catch (error) {
@@ -1441,6 +1460,13 @@
                     this.currentTenant = null;
                     this.isAuthenticated = false;
                     this.updateUI();
+                }
+            }
+
+            // Sign out method for the button
+            async signOut() {
+                if (this.currentTenant) {
+                    await this.signOutFromTenant(this.currentTenant);
                 }
             }
 
@@ -1534,6 +1560,7 @@
                 this.demoMode = false;
             }
 
+            // FIXED: Updated fetchFlows method with correct API endpoints and token handling
             async fetchFlows(config, accessToken) {
                 const { targetTenantId, environmentId, connectionType } = config;
                 
@@ -1550,27 +1577,39 @@
 
                 try {
                     let url;
+                    let apiType = 'powerautomate'; // Default
+                    
                     switch (connectionType) {
                         case 'graph':
-                            // Use Microsoft Graph API
-                            url = `${this.graphUrl}/v1.0/subscriptions/${config.subscriptionId}/resourceGroups/${config.resourceGroup}/providers/Microsoft.Logic/workflows`;
+                            // Microsoft Graph doesn't directly support Power Automate flows
+                            // This would be for other Graph resources
+                            url = `${this.graphUrl}/v1.0/me/drive/items`; // Example Graph endpoint
+                            apiType = 'graph';
                             break;
                         case 'logicapps':
-                            // Use Azure Management API for Logic Apps
+                            // Azure Logic Apps via Management API
                             url = `${this.managementUrl}/subscriptions/${config.subscriptionId}/resourceGroups/${config.resourceGroup}/providers/Microsoft.Logic/workflows?api-version=2019-05-01`;
+                            apiType = 'management';
                             break;
                         default:
-                            // Use Power Automate Management API
-                            url = `${this.baseUrl}/providers/Microsoft.ProcessSimple/environments/${environmentId}/flows?api-version=2016-11-01`;
+                            // Power Automate API - correct endpoint
+                            url = `https://api.flow.microsoft.com/providers/Microsoft.ProcessSimple/environments/${environmentId}/flows?api-version=2016-11-01`;
+                            apiType = 'powerautomate';
                     }
 
-                    logger.log('API Request', 'info', { url, tenant: targetTenantId });
+                    // Get the correct token for the API being called
+                    if (!accessToken) {
+                        accessToken = await authManager.getAccessTokenForTenant(targetTenantId, apiType);
+                    }
+
+                    logger.log('API Request', 'info', { url, tenant: targetTenantId, apiType });
 
                     const response = await fetch(url, {
                         method: 'GET',
                         headers: {
                             'Authorization': `Bearer ${accessToken}`,
-                            'Content-Type': 'application/json'
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json'
                         }
                     });
 
@@ -1581,9 +1620,13 @@
                             error: errorText 
                         });
                         
-                        // Check if it's a cross-tenant issue
-                        if (response.status === 401 || response.status === 403) {
-                            throw new Error('Access denied. Ensure the app registration has proper permissions in the target tenant.');
+                        // Provide specific error guidance
+                        if (response.status === 401) {
+                            throw new Error('Authentication failed. Check if the app has permissions in the target tenant.');
+                        } else if (response.status === 403) {
+                            throw new Error('Access denied. Ensure the app registration has Power Automate API permissions and admin consent.');
+                        } else if (response.status === 404) {
+                            throw new Error('Environment not found. Check the Environment ID.');
                         }
                         
                         throw new Error(`API Error: ${response.status} - ${errorText}`);
@@ -1693,6 +1736,7 @@
                 logger.log('Auth modal opened', 'info');
             }
 
+            // FIXED: Updated connectToTenant method with proper token handling
             async connectToTenant(connection, authOption) {
                 logger.log('Connecting to tenant', 'info', { 
                     connection: connection.name,
@@ -1703,17 +1747,20 @@
                 try {
                     showAlert('Connecting to tenant...', 'warning');
                     
-                    // Authenticate to the target tenant
+                    // Step 1: Authenticate to the target tenant (basic login)
                     await authManager.signInToTenant(connection.targetTenantId);
                     
-                    // Get access token for the target tenant
-                    const accessToken = await authManager.getAccessTokenForTenant(connection.targetTenantId);
+                    // Step 2: Get specific token for Power Automate API
+                    const accessToken = await authManager.getAccessTokenForTenant(
+                        connection.targetTenantId, 
+                        connection.connectionType || 'powerautomate'
+                    );
                     
                     if (!accessToken) {
                         throw new Error('Failed to obtain access token');
                     }
 
-                    // Fetch flows from the target tenant
+                    // Step 3: Fetch flows from the target tenant
                     this.currentConnection = connection;
                     this.flows = await this.apiClient.fetchFlows({
                         targetTenantId: connection.targetTenantId,
@@ -1773,7 +1820,8 @@
                 
                 try {
                     const accessToken = await authManager.getAccessTokenForTenant(
-                        this.currentConnection.targetTenantId
+                        this.currentConnection.targetTenantId,
+                        this.currentConnection.connectionType || 'powerautomate'
                     );
                     
                     this.flows = await this.apiClient.fetchFlows({
@@ -2046,6 +2094,7 @@
             }
         }
 
+        // FIXED: Updated testConnection function
         async function testConnection() {
             logger.log('Testing connection...', 'info');
             
@@ -2068,8 +2117,18 @@
                 // Try to authenticate to the target tenant
                 await authManager.signInToTenant(config.targetTenantId);
                 
-                showAlert('Connection test successful! You can access this tenant.', 'success');
-                logger.log('Connection test passed', 'success');
+                // Try to get a token for the specific API
+                const token = await authManager.getAccessTokenForTenant(
+                    config.targetTenantId, 
+                    config.connectionType || 'powerautomate'
+                );
+                
+                if (token) {
+                    showAlert('Connection test successful! You can access this tenant and API.', 'success');
+                    logger.log('Connection test passed', 'success');
+                } else {
+                    throw new Error('Failed to obtain API access token');
+                }
             } catch (error) {
                 showAlert(`Connection test failed: ${error.message}`, 'error');
                 logger.log('Connection test error', 'error', error);
@@ -2194,6 +2253,11 @@
             logger.log('2. Update YOUR_MULTI_TENANT_APP_CLIENT_ID in the code', 'warning');
             logger.log('3. Configure API permissions for Power Automate/Graph', 'warning');
             logger.log('4. Grant admin consent in target tenants', 'warning');
+            logger.log('', 'info');
+            logger.log('RECOMMENDED API PERMISSIONS:', 'info');
+            logger.log('- Microsoft Graph: User.Read (delegated)', 'info');
+            logger.log('- Power Platform API: User (delegated)', 'info');
+            logger.log('- Azure Service Management: user_impersonation (delegated)', 'info');
         });
     </script>
 </body>
