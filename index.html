@@ -214,6 +214,7 @@
             justify-content: space-between;
             align-items: start;
             margin-bottom: 15px;
+            gap: 10px;
         }
 
         .flow-name {
@@ -221,12 +222,20 @@
             font-weight: 600;
             color: var(--text-primary);
             margin-bottom: 5px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
         }
 
         .flow-id {
             font-size: 11px;
             color: var(--text-secondary);
             font-family: 'Courier New', monospace;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
 
         .flow-status {
@@ -250,6 +259,30 @@
         .status-suspended {
             background-color: #fde7e9;
             color: var(--error-color);
+        }
+
+        .run-status {
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            display: inline-block;
+        }
+
+        .status-succeeded {
+            background-color: #e6f6e6;
+            color: var(--success-color);
+        }
+
+        .status-failed {
+            background-color: #fde7e9;
+            color: var(--error-color);
+        }
+
+        .status-cancelled {
+            background-color: #f3f2f1;
+            color: var(--text-secondary);
         }
 
         .flow-details {
@@ -296,6 +329,10 @@
 
         @keyframes spin {
             to { transform: rotate(360deg); }
+        }
+
+        .rotating {
+            animation: spin 1s linear infinite;
         }
 
         .loading-text {
@@ -397,10 +434,10 @@
                 <div class="user-info">
                     <span class="user-email" id="userEmail"></span>
                     <button id="refreshButton" class="btn btn-secondary">
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" id="refreshIcon">
                             <path d="M13.65 2.35c-1.8-1.8-4.7-1.8-6.5 0L5.5 4H8v1H3.5V.5h1V3l1.65-1.65c2.2-2.2 5.8-2.2 8 0s2.2 5.8 0 8c-1.1 1.1-2.55 1.65-4 1.65V10c1.05 0 2.1-.4 2.9-1.2 1.6-1.6 1.6-4.2 0-5.8z" fill="currentColor"/>
                         </svg>
-                        Refresh
+                        <span id="refreshText">Refresh</span>
                     </button>
                     <button id="logoutButton" class="btn btn-secondary">Sign Out</button>
                 </div>
@@ -424,8 +461,19 @@
                     </select>
                 </div>
                 <div class="filter-group">
+                    <label class="filter-label">Last Run</label>
+                    <select id="runStatusFilter" class="filter-input">
+                        <option value="">All Runs</option>
+                        <option value="Succeeded">Succeeded</option>
+                        <option value="Failed">Failed</option>
+                        <option value="Cancelled">Cancelled</option>
+                        <option value="NoRuns">No Runs</option>
+                        <option value="Recent">Recent (24h)</option>
+                    </select>
+                </div>
+                <div class="filter-group">
                     <label class="filter-label">Environment</label>
-                    <input type="text" id="environmentId" class="filter-input" value="Default-30b2cab5-4b41-42ba-9ae3-af22c87241d9" readonly>
+                    <input type="text" id="environmentIdInput" class="filter-input" value="Default-30b2cab5-4b41-42ba-9ae3-af22c87241d9" readonly>
                 </div>
             </div>
 
@@ -448,6 +496,9 @@
                     <div class="stat-label">Suspended</div>
                 </div>
             </div>
+            
+            <!-- Last refresh indicator -->
+            <div style="text-align: right; margin-bottom: 20px; color: var(--text-secondary); font-size: 12px;" id="lastRefreshTime"></div>
 
             <!-- Loading State -->
             <div id="loadingState" class="loading hidden">
@@ -575,6 +626,25 @@
         let allFlows = [];
         let filteredFlows = [];
         let isInitialized = false;
+        let autoRefreshInterval = null;
+
+        // Auto-refresh functionality
+        function startAutoRefresh(intervalMinutes = 5) {
+            stopAutoRefresh(); // Clear any existing interval
+            autoRefreshInterval = setInterval(() => {
+                console.log('Auto-refreshing flows...');
+                loadFlows();
+            }, intervalMinutes * 60 * 1000);
+            console.log(`Auto-refresh enabled: every ${intervalMinutes} minutes`);
+        }
+
+        function stopAutoRefresh() {
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+                autoRefreshInterval = null;
+                console.log('Auto-refresh disabled');
+            }
+        }
 
         // Initialize the application
         async function initializeApp() {
@@ -637,6 +707,9 @@
             if (currentAccount) {
                 document.getElementById('userEmail').textContent = currentAccount.username;
             }
+            
+            // Start auto-refresh (every 5 minutes)
+            startAutoRefresh(5);
         }
 
         // Sign in
@@ -704,6 +777,9 @@
                 return;
             }
             
+            // Stop auto-refresh
+            stopAutoRefresh();
+            
             const logoutRequest = {
                 account: currentAccount,
                 postLogoutRedirectUri: window.location.origin + '/'
@@ -760,6 +836,17 @@
         async function loadFlows() {
             showLoading(true);
             hideError();
+            
+            // Animate refresh button
+            const refreshIcon = document.getElementById('refreshIcon');
+            const refreshText = document.getElementById('refreshText');
+            const refreshButton = document.getElementById('refreshButton');
+            
+            if (refreshIcon && refreshText && refreshButton) {
+                refreshIcon.classList.add('rotating');
+                refreshText.textContent = 'Refreshing...';
+                refreshButton.disabled = true;
+            }
 
             try {
                 const token = await getToken();
@@ -781,21 +868,126 @@
                 const data = await response.json();
                 allFlows = data.value || [];
                 
+                // Show flows immediately
                 applyFilters();
                 updateStatistics();
+                showLoading(false);
+                
+                // Then fetch run history in the background
+                showLoadingMessage('Loading run history...');
+                await fetchFlowRuns(token);
+                hideLoadingMessage();
+                
+                // Re-render with run information
+                applyFilters();
+                updateStatistics();
+                
+                // Update last refresh time
+                const lastRefreshElement = document.getElementById('lastRefreshTime');
+                if (lastRefreshElement) {
+                    const now = new Date();
+                    lastRefreshElement.textContent = `Last updated: ${now.toLocaleTimeString()} (auto-refresh every 5 minutes)`;
+                }
                 
             } catch (error) {
                 console.error('Error loading flows:', error);
                 showError('Failed to load flows. Please check your permissions and try again.');
-            } finally {
                 showLoading(false);
+            } finally {
+                // Reset refresh button
+                if (refreshIcon && refreshText && refreshButton) {
+                    refreshIcon.classList.remove('rotating');
+                    refreshText.textContent = 'Refresh';
+                    refreshButton.disabled = false;
+                }
             }
+        }
+
+        // Show loading message
+        function showLoadingMessage(message) {
+            const existingMessage = document.getElementById('loadingMessage');
+            if (existingMessage) {
+                existingMessage.textContent = message;
+            } else {
+                const messageDiv = document.createElement('div');
+                messageDiv.id = 'loadingMessage';
+                messageDiv.style.cssText = 'background: #e7f3ff; color: #0078d4; padding: 10px 20px; border-radius: 4px; margin-bottom: 20px; display: flex; align-items: center; gap: 10px;';
+                messageDiv.innerHTML = `
+                    <div style="width: 20px; height: 20px; border: 2px solid #e7f3ff; border-top-color: #0078d4; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                    <span>${message}</span>
+                `;
+                const container = document.querySelector('.container');
+                const flowsGrid = document.getElementById('flowsGrid');
+                container.insertBefore(messageDiv, flowsGrid);
+            }
+        }
+
+        // Hide loading message
+        function hideLoadingMessage() {
+            const messageDiv = document.getElementById('loadingMessage');
+            if (messageDiv) {
+                messageDiv.remove();
+            }
+        }
+
+        // Fetch run history for flows
+        async function fetchFlowRuns(token) {
+            console.log('Fetching run history for flows...');
+            
+            // Process flows in batches to avoid overwhelming the API
+            const batchSize = 10;
+            let processedCount = 0;
+            let successCount = 0;
+            let errorCount = 0;
+            
+            for (let i = 0; i < allFlows.length; i += batchSize) {
+                const batch = allFlows.slice(i, i + batchSize);
+                
+                await Promise.all(batch.map(async (flow) => {
+                    try {
+                        // Get the last run for this flow
+                        const runsResponse = await fetch(
+                            `https://api.flow.microsoft.com/providers/Microsoft.ProcessSimple/environments/${environmentId}/flows/${flow.name}/runs?api-version=2016-11-01&$top=1`,
+                            {
+                                headers: {
+                                    'Authorization': `Bearer ${token}`,
+                                    'Content-Type': 'application/json'
+                                }
+                            }
+                        );
+
+                        if (runsResponse.ok) {
+                            const runsData = await runsResponse.json();
+                            if (runsData.value && runsData.value.length > 0) {
+                                flow.lastRun = runsData.value[0];
+                                successCount++;
+                            }
+                        } else if (runsResponse.status === 404) {
+                            // Flow has no runs - this is normal
+                            console.log(`No runs found for flow: ${flow.properties.displayName}`);
+                        } else {
+                            console.warn(`Failed to fetch runs for flow ${flow.properties.displayName}: ${runsResponse.status}`);
+                            errorCount++;
+                        }
+                    } catch (error) {
+                        console.error(`Error fetching runs for flow ${flow.properties.displayName}:`, error);
+                        errorCount++;
+                    }
+                }));
+                
+                processedCount += batch.length;
+                showLoadingMessage(`Loading run history... (${processedCount}/${allFlows.length})`);
+            }
+            
+            console.log(`Finished fetching run history. Success: ${successCount}, Errors: ${errorCount}`);
         }
 
         // Apply filters
         function applyFilters() {
             const searchTerm = document.getElementById('searchInput').value.toLowerCase();
             const statusFilter = document.getElementById('statusFilter').value;
+            const runStatusFilterElement = document.getElementById('runStatusFilter');
+            const runStatusFilter = runStatusFilterElement ? runStatusFilterElement.value : '';
 
             filteredFlows = allFlows.filter(flow => {
                 const matchesSearch = !searchTerm || 
@@ -805,7 +997,25 @@
                 const matchesStatus = !statusFilter || 
                     flow.properties.state === statusFilter;
 
-                return matchesSearch && matchesStatus;
+                let matchesRunStatus = true;
+                if (runStatusFilter) {
+                    if (runStatusFilter === 'NoRuns') {
+                        matchesRunStatus = !flow.lastRun;
+                    } else if (runStatusFilter === 'Recent') {
+                        // Show flows with runs in the last 24 hours
+                        if (flow.lastRun) {
+                            const runTime = new Date(flow.lastRun.properties.startTime);
+                            const hoursSinceRun = (new Date() - runTime) / (1000 * 60 * 60);
+                            matchesRunStatus = hoursSinceRun <= 24;
+                        } else {
+                            matchesRunStatus = false;
+                        }
+                    } else {
+                        matchesRunStatus = flow.lastRun && flow.lastRun.properties.status === runStatusFilter;
+                    }
+                }
+
+                return matchesSearch && matchesStatus && matchesRunStatus;
             });
 
             renderFlows();
@@ -838,6 +1048,36 @@
             const createdTime = new Date(flow.properties.createdTime).toLocaleDateString();
             const modifiedTime = new Date(flow.properties.lastModifiedTime).toLocaleDateString();
             
+            // Get last run information
+            let lastRunHTML = '';
+            if (flow.lastRun) {
+                const runStatus = flow.lastRun.properties.status;
+                const runTime = new Date(flow.lastRun.properties.startTime);
+                const timeAgo = getTimeAgo(runTime);
+                
+                let runStatusClass = 'status-running';
+                if (runStatus === 'Succeeded') runStatusClass = 'status-succeeded';
+                else if (runStatus === 'Failed') runStatusClass = 'status-failed';
+                else if (runStatus === 'Cancelled') runStatusClass = 'status-cancelled';
+                
+                lastRunHTML = `
+                    <div class="flow-detail" style="grid-column: 1 / -1;">
+                        <span class="detail-label">Last Run</span>
+                        <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
+                            <span class="run-status ${runStatusClass}">${runStatus}</span>
+                            <span class="detail-value" style="font-size: 12px;" title="${runTime.toLocaleString()}">${timeAgo}</span>
+                        </div>
+                    </div>
+                `;
+            } else {
+                lastRunHTML = `
+                    <div class="flow-detail" style="grid-column: 1 / -1;">
+                        <span class="detail-label">Last Run</span>
+                        <span class="detail-value" style="color: #a19f9d; font-style: italic;">No runs yet</span>
+                    </div>
+                `;
+            }
+            
             card.innerHTML = `
                 <div class="flow-header">
                     <div>
@@ -863,6 +1103,7 @@
                         <span class="detail-label">Environment</span>
                         <span class="detail-value">${flow.properties.environment.name}</span>
                     </div>
+                    ${lastRunHTML}
                 </div>
             `;
             
@@ -871,6 +1112,33 @@
             });
             
             return card;
+        }
+
+        // Helper function to get relative time
+        function getTimeAgo(date) {
+            const seconds = Math.floor((new Date() - date) / 1000);
+            
+            let interval = Math.floor(seconds / 31536000);
+            if (interval > 1) return interval + ' years ago';
+            if (interval === 1) return '1 year ago';
+            
+            interval = Math.floor(seconds / 2592000);
+            if (interval > 1) return interval + ' months ago';
+            if (interval === 1) return '1 month ago';
+            
+            interval = Math.floor(seconds / 86400);
+            if (interval > 1) return interval + ' days ago';
+            if (interval === 1) return '1 day ago';
+            
+            interval = Math.floor(seconds / 3600);
+            if (interval > 1) return interval + ' hours ago';
+            if (interval === 1) return '1 hour ago';
+            
+            interval = Math.floor(seconds / 60);
+            if (interval > 1) return interval + ' minutes ago';
+            if (interval === 1) return '1 minute ago';
+            
+            return 'Just now';
         }
 
         // Update statistics
@@ -882,10 +1150,63 @@
                 suspended: allFlows.filter(f => f.properties.state === 'Suspended').length
             };
 
+            // Calculate run statistics
+            let recentRuns = 0;
+            let failedRuns = 0;
+            let succeededRuns = 0;
+            let todayRuns = 0;
+            const now = new Date();
+            const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            
+            allFlows.forEach(flow => {
+                if (flow.lastRun) {
+                    const runTime = new Date(flow.lastRun.properties.startTime);
+                    const hoursSinceRun = (now - runTime) / (1000 * 60 * 60);
+                    
+                    if (hoursSinceRun <= 24) {
+                        recentRuns++;
+                    }
+                    
+                    if (runTime >= todayStart) {
+                        todayRuns++;
+                    }
+                    
+                    if (flow.lastRun.properties.status === 'Failed') {
+                        failedRuns++;
+                    } else if (flow.lastRun.properties.status === 'Succeeded') {
+                        succeededRuns++;
+                    }
+                }
+            });
+
             document.getElementById('totalFlows').textContent = stats.total;
             document.getElementById('runningFlows').textContent = stats.running;
             document.getElementById('stoppedFlows').textContent = stats.stopped;
             document.getElementById('suspendedFlows').textContent = stats.suspended;
+            
+            // Update additional statistics
+            const totalCard = document.querySelector('.stat-card:first-child');
+            if (totalCard && todayRuns > 0) {
+                totalCard.innerHTML = `
+                    <div class="stat-value" id="totalFlows">${stats.total}</div>
+                    <div class="stat-label">Total Flows</div>
+                    <div style="font-size: 11px; color: var(--text-secondary); margin-top: 5px;">
+                        ${todayRuns} run${todayRuns !== 1 ? 's' : ''} today
+                    </div>
+                `;
+            }
+            
+            // Update the suspended card to show failed runs if any
+            const suspendedCard = document.querySelector('.stat-card.error');
+            if (suspendedCard && failedRuns > 0) {
+                suspendedCard.innerHTML = `
+                    <div class="stat-value" id="suspendedFlows">${stats.suspended}</div>
+                    <div class="stat-label">Suspended</div>
+                    <div style="font-size: 11px; color: var(--text-secondary); margin-top: 5px;">
+                        ${failedRuns} flow${failedRuns !== 1 ? 's' : ''} with failed runs
+                    </div>
+                `;
+            }
         }
 
         // Show/hide loading state
@@ -967,13 +1288,24 @@
             console.log('Debug functions available at window.debugAuth');
         }
 
-        // Event listeners
-        document.getElementById('loginButton').addEventListener('click', signIn);
-        document.getElementById('testConfigButton').addEventListener('click', testConfiguration);
-        document.getElementById('logoutButton').addEventListener('click', signOut);
-        document.getElementById('refreshButton').addEventListener('click', loadFlows);
-        document.getElementById('searchInput').addEventListener('input', applyFilters);
-        document.getElementById('statusFilter').addEventListener('change', applyFilters);
+        // Event listeners - setup after DOM is ready
+        window.addEventListener('DOMContentLoaded', () => {
+            const loginButton = document.getElementById('loginButton');
+            const testConfigButton = document.getElementById('testConfigButton');
+            const logoutButton = document.getElementById('logoutButton');
+            const refreshButton = document.getElementById('refreshButton');
+            const searchInput = document.getElementById('searchInput');
+            const statusFilter = document.getElementById('statusFilter');
+            const runStatusFilter = document.getElementById('runStatusFilter');
+            
+            if (loginButton) loginButton.addEventListener('click', signIn);
+            if (testConfigButton) testConfigButton.addEventListener('click', testConfiguration);
+            if (logoutButton) logoutButton.addEventListener('click', signOut);
+            if (refreshButton) refreshButton.addEventListener('click', loadFlows);
+            if (searchInput) searchInput.addEventListener('input', applyFilters);
+            if (statusFilter) statusFilter.addEventListener('change', applyFilters);
+            if (runStatusFilter) runStatusFilter.addEventListener('change', applyFilters);
+        });
 
         // Initialize app on load
         window.addEventListener('load', () => {
