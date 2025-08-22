@@ -379,6 +379,10 @@
                 </svg>
                 Sign in with Microsoft
             </button>
+            <button id="testConfigButton" class="btn btn-secondary" style="width: 100%; margin-top: 10px;">
+                Test Configuration
+            </button>
+            <div id="configStatus" style="margin-top: 10px; padding: 10px; border-radius: 4px; display: none; font-size: 12px; text-align: left;"></div>
         </div>
     </div>
 
@@ -473,11 +477,37 @@
             auth: {
                 clientId: '07d85d3a-2d71-451f-a148-3ab6a12cb2b1',
                 authority: 'https://login.microsoftonline.com/30b2cab5-4b41-42ba-9ae3-af22c87241d9',
-                redirectUri: 'https://white-stone-0a0c84010.1.azurestaticapps.net/'
+                redirectUri: window.location.origin + '/',
+                navigateToLoginRequestUrl: false
             },
             cache: {
                 cacheLocation: 'sessionStorage',
                 storeAuthStateInCookie: false
+            },
+            system: {
+                loggerOptions: {
+                    loggerCallback: (level, message, containsPii) => {
+                        if (containsPii) {
+                            return;
+                        }
+                        switch (level) {
+                            case msal.LogLevel.Error:
+                                console.error(message);
+                                return;
+                            case msal.LogLevel.Info:
+                                console.info(message);
+                                return;
+                            case msal.LogLevel.Verbose:
+                                console.debug(message);
+                                return;
+                            case msal.LogLevel.Warning:
+                                console.warn(message);
+                                return;
+                        }
+                    },
+                    piiLoggingEnabled: false,
+                    logLevel: msal.LogLevel.Info
+                }
             }
         };
 
@@ -485,34 +515,56 @@
         
         // Initialize MSAL
         const msalInstance = new msal.PublicClientApplication(config);
-
+        
         // Application state
         let currentAccount = null;
         let allFlows = [];
         let filteredFlows = [];
+        let isInitialized = false;
 
         // Initialize the application
         async function initializeApp() {
+            console.log('Starting app initialization...');
+            console.log('Redirect URI:', window.location.origin + '/');
+            
             try {
+                // Wait for MSAL to initialize
                 await msalInstance.initialize();
+                isInitialized = true;
+                console.log('MSAL initialized successfully');
                 
                 // Handle redirect response
-                const response = await msalInstance.handleRedirectPromise();
-                if (response) {
-                    currentAccount = response.account;
+                try {
+                    const response = await msalInstance.handleRedirectPromise();
+                    console.log('Redirect response:', response);
+                    
+                    if (response && response.account) {
+                        currentAccount = response.account;
+                        console.log('User signed in via redirect:', currentAccount.username);
+                        showDashboard();
+                        await loadFlows();
+                        return;
+                    }
+                } catch (redirectError) {
+                    console.error('Error handling redirect:', redirectError);
                 }
 
                 // Check if user is already signed in
                 const accounts = msalInstance.getAllAccounts();
+                console.log('Found accounts:', accounts.length);
+                
                 if (accounts.length > 0) {
                     currentAccount = accounts[0];
+                    console.log('User already signed in:', currentAccount.username);
                     showDashboard();
                     await loadFlows();
                 } else {
+                    console.log('No user signed in, showing login screen');
                     showLoginScreen();
                 }
             } catch (error) {
                 console.error('Initialization error:', error);
+                alert('Failed to initialize authentication. Please check console for details.');
                 showLoginScreen();
             }
         }
@@ -535,46 +587,117 @@
 
         // Sign in
         async function signIn() {
+            console.log('Sign in button clicked');
+            
+            // Check if MSAL is initialized
+            if (!isInitialized) {
+                console.error('MSAL not initialized yet');
+                alert('Authentication system is still loading. Please try again in a moment.');
+                return;
+            }
+            
             const loginRequest = {
-                scopes: ['https://service.flow.microsoft.com//.default']
+                scopes: ['https://service.flow.microsoft.com//.default'],
+                prompt: 'select_account'
             };
 
+            console.log('Attempting login with request:', loginRequest);
+            
             try {
-                await msalInstance.loginRedirect(loginRequest);
+                // Try popup first, fallback to redirect if blocked
+                try {
+                    console.log('Trying popup login...');
+                    const response = await msalInstance.loginPopup(loginRequest);
+                    console.log('Popup login successful:', response);
+                    
+                    if (response.account) {
+                        currentAccount = response.account;
+                        showDashboard();
+                        await loadFlows();
+                    }
+                } catch (popupError) {
+                    console.error('Popup blocked or failed:', popupError);
+                    console.log('Falling back to redirect login...');
+                    
+                    // Fallback to redirect
+                    await msalInstance.loginRedirect(loginRequest);
+                }
             } catch (error) {
                 console.error('Login error:', error);
-                showError('Failed to sign in. Please try again.');
+                
+                // Provide more specific error messages
+                let errorMessage = 'Failed to sign in. ';
+                
+                if (error.errorCode === 'popup_window_error') {
+                    errorMessage += 'Pop-up blocked. Please allow pop-ups for this site.';
+                } else if (error.errorCode === 'user_cancelled') {
+                    errorMessage += 'Sign-in was cancelled.';
+                } else if (error.errorCode) {
+                    errorMessage += `Error code: ${error.errorCode}`;
+                } else {
+                    errorMessage += 'Please check console for details.';
+                }
+                
+                alert(errorMessage);
+                showError(errorMessage);
             }
         }
 
         // Sign out
-        function signOut() {
+        async function signOut() {
+            if (!currentAccount) {
+                console.log('No account to sign out');
+                return;
+            }
+            
             const logoutRequest = {
                 account: currentAccount,
-                postLogoutRedirectUri: 'https://white-stone-0a0c84010.1.azurestaticapps.net/'
+                postLogoutRedirectUri: window.location.origin + '/'
             };
 
-            msalInstance.logoutRedirect(logoutRequest);
+            console.log('Signing out:', currentAccount.username);
+            
+            try {
+                await msalInstance.logoutRedirect(logoutRequest);
+            } catch (error) {
+                console.error('Logout error:', error);
+                // Clear local cache even if logout fails
+                sessionStorage.clear();
+                location.reload();
+            }
         }
 
         // Get access token
         async function getToken() {
             const tokenRequest = {
                 scopes: ['https://service.flow.microsoft.com//.default'],
-                account: currentAccount
+                account: currentAccount,
+                forceRefresh: false
             };
 
             try {
+                console.log('Acquiring token silently...');
                 const response = await msalInstance.acquireTokenSilent(tokenRequest);
+                console.log('Token acquired successfully');
                 return response.accessToken;
             } catch (error) {
-                console.error('Token acquisition failed, attempting interactive:', error);
-                try {
-                    const response = await msalInstance.acquireTokenRedirect(tokenRequest);
-                    return response.accessToken;
-                } catch (interactiveError) {
-                    console.error('Interactive token acquisition failed:', interactiveError);
-                    throw interactiveError;
+                console.error('Silent token acquisition failed:', error);
+                
+                if (error instanceof msal.InteractionRequiredAuthError) {
+                    console.log('Interaction required, attempting interactive token acquisition...');
+                    try {
+                        // Try popup first
+                        const response = await msalInstance.acquireTokenPopup(tokenRequest);
+                        console.log('Token acquired via popup');
+                        return response.accessToken;
+                    } catch (popupError) {
+                        console.error('Popup token acquisition failed:', popupError);
+                        // Fallback to redirect
+                        await msalInstance.acquireTokenRedirect(tokenRequest);
+                    }
+                } else {
+                    console.error('Token acquisition error:', error);
+                    throw error;
                 }
             }
         }
@@ -734,15 +857,51 @@
             document.getElementById('errorState').classList.add('hidden');
         }
 
+        // Test configuration
+        function testConfiguration() {
+            const statusDiv = document.getElementById('configStatus');
+            statusDiv.style.display = 'block';
+            statusDiv.style.backgroundColor = '#e7f3ff';
+            statusDiv.style.color = '#0078d4';
+            
+            let statusHTML = '<strong>Configuration Check:</strong><br>';
+            statusHTML += `✓ Client ID: ${config.auth.clientId}<br>`;
+            statusHTML += `✓ Tenant ID: 30b2cab5-4b41-42ba-9ae3-af22c87241d9<br>`;
+            statusHTML += `✓ Current URL: ${window.location.origin}/<br>`;
+            statusHTML += `✓ Redirect URI: ${config.auth.redirectUri}<br>`;
+            statusHTML += `✓ MSAL Initialized: ${isInitialized ? 'Yes' : 'No'}<br>`;
+            statusHTML += `✓ MSAL Version: ${msal ? 'Loaded' : 'Not Loaded'}<br>`;
+            
+            if (window.location.origin + '/' !== 'https://white-stone-0a0c84010.1.azurestaticapps.net/') {
+                statusHTML += `<br><strong style="color: #d83b01;">⚠ Warning:</strong> Current URL doesn't match expected redirect URI<br>`;
+                statusHTML += `Expected: https://white-stone-0a0c84010.1.azurestaticapps.net/<br>`;
+                statusHTML += `Please ensure this URL is added to your Azure App Registration`;
+            }
+            
+            statusDiv.innerHTML = statusHTML;
+        }
+
         // Event listeners
         document.getElementById('loginButton').addEventListener('click', signIn);
+        document.getElementById('testConfigButton').addEventListener('click', testConfiguration);
         document.getElementById('logoutButton').addEventListener('click', signOut);
         document.getElementById('refreshButton').addEventListener('click', loadFlows);
         document.getElementById('searchInput').addEventListener('input', applyFilters);
         document.getElementById('statusFilter').addEventListener('change', applyFilters);
 
         // Initialize app on load
-        window.addEventListener('load', initializeApp);
+        window.addEventListener('load', () => {
+            // Give MSAL library time to fully load
+            setTimeout(() => {
+                if (typeof msal === 'undefined') {
+                    console.error('MSAL library failed to load');
+                    alert('Authentication library failed to load. Please refresh the page.');
+                    return;
+                }
+                console.log('MSAL library loaded, initializing app...');
+                initializeApp();
+            }, 100);
+        });
     </script>
 </body>
 </html>
