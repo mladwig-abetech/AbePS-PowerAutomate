@@ -468,8 +468,62 @@
         </div>
     </div>
 
-    <!-- MSAL.js library -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-authentication-library-js/2.38.0/msal-browser.min.js"></script>
+    <!-- MSAL.js library with multiple fallbacks -->
+    <script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
+    
+    <script>
+        // Multiple CDN fallback loader for MSAL
+        const msalSources = [
+            'https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js',
+            'https://unpkg.com/@azure/msal-browser@2.38.0/lib/msal-browser.min.js',
+            'https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.0/lib/msal-browser.min.js',
+            'https://cdnjs.cloudflare.com/ajax/libs/microsoft-authentication-library-js/2.38.0/msal-browser.min.js'
+        ];
+        
+        let sourceIndex = 0;
+        
+        function loadMSALFallback() {
+            if (sourceIndex >= msalSources.length) {
+                console.error('Failed to load MSAL from all sources');
+                document.getElementById('configStatus').style.display = 'block';
+                document.getElementById('configStatus').style.backgroundColor = '#fde7e9';
+                document.getElementById('configStatus').style.color = '#d83b01';
+                document.getElementById('configStatus').innerHTML = 
+                    '<strong>Critical Error:</strong> Unable to load authentication library.<br>' +
+                    'Please check your network connection and firewall settings.<br>' +
+                    'The Microsoft Authentication Library (MSAL) is required for this application.';
+                return;
+            }
+            
+            console.log('Attempting to load MSAL from:', msalSources[sourceIndex]);
+            const script = document.createElement('script');
+            script.src = msalSources[sourceIndex];
+            script.onload = function() {
+                console.log('MSAL loaded successfully from:', msalSources[sourceIndex]);
+                // Restart initialization after successful load
+                if (typeof initializeApp === 'function') {
+                    setTimeout(initializeApp, 100);
+                }
+            };
+            script.onerror = function() {
+                console.error('Failed to load from:', msalSources[sourceIndex]);
+                sourceIndex++;
+                loadMSALFallback(); // Try next source
+            };
+            document.head.appendChild(script);
+        }
+        
+        // Check if MSAL loaded after primary script
+        setTimeout(function() {
+            if (typeof msal === 'undefined') {
+                console.warn('MSAL not loaded from primary source, trying fallbacks...');
+                sourceIndex = 1; // Skip first source as it already failed
+                loadMSALFallback();
+            } else {
+                console.log('MSAL loaded successfully from primary source');
+            }
+        }, 1500);
+    </script>
     
     <script>
         // Configuration
@@ -869,8 +923,29 @@
             statusHTML += `✓ Tenant ID: 30b2cab5-4b41-42ba-9ae3-af22c87241d9<br>`;
             statusHTML += `✓ Current URL: ${window.location.origin}/<br>`;
             statusHTML += `✓ Redirect URI: ${config.auth.redirectUri}<br>`;
+            statusHTML += `✓ MSAL Library: ${typeof msal !== 'undefined' ? 'Loaded' : '<span style="color: red;">NOT LOADED</span>'}<br>`;
             statusHTML += `✓ MSAL Initialized: ${isInitialized ? 'Yes' : 'No'}<br>`;
-            statusHTML += `✓ MSAL Version: ${msal ? 'Loaded' : 'Not Loaded'}<br>`;
+            
+            if (typeof msal === 'undefined') {
+                statusHTML += `<br><strong style="color: #d83b01;">⚠ Critical Issue:</strong> MSAL library not loaded<br>`;
+                statusHTML += `Attempting manual load...<br>`;
+                
+                // Try to manually load MSAL
+                const script = document.createElement('script');
+                script.src = 'https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.0/lib/msal-browser.min.js';
+                script.onload = function() {
+                    statusHTML += '<span style="color: green;">✓ MSAL loaded manually! Refreshing...</span>';
+                    statusDiv.innerHTML = statusHTML;
+                    setTimeout(() => {
+                        location.reload();
+                    }, 2000);
+                };
+                script.onerror = function() {
+                    statusHTML += '<span style="color: red;">✗ Manual load failed. Check network/firewall.</span>';
+                    statusDiv.innerHTML = statusHTML;
+                };
+                document.head.appendChild(script);
+            }
             
             if (window.location.origin + '/' !== 'https://white-stone-0a0c84010.1.azurestaticapps.net/') {
                 statusHTML += `<br><strong style="color: #d83b01;">⚠ Warning:</strong> Current URL doesn't match expected redirect URI<br>`;
@@ -879,6 +954,17 @@
             }
             
             statusDiv.innerHTML = statusHTML;
+            
+            // Make functions available globally for debugging
+            window.debugAuth = {
+                msalInstance: msalInstance,
+                config: config,
+                signIn: signIn,
+                initializeApp: initializeApp,
+                currentAccount: currentAccount
+            };
+            
+            console.log('Debug functions available at window.debugAuth');
         }
 
         // Event listeners
@@ -891,16 +977,38 @@
 
         // Initialize app on load
         window.addEventListener('load', () => {
-            // Give MSAL library time to fully load
-            setTimeout(() => {
-                if (typeof msal === 'undefined') {
-                    console.error('MSAL library failed to load');
-                    alert('Authentication library failed to load. Please refresh the page.');
-                    return;
+            console.log('Page loaded, checking for MSAL...');
+            
+            let attempts = 0;
+            const maxAttempts = 10;
+            
+            const checkMSAL = setInterval(() => {
+                attempts++;
+                
+                if (typeof msal !== 'undefined') {
+                    console.log('MSAL library detected, initializing app...');
+                    clearInterval(checkMSAL);
+                    initializeApp();
+                } else if (attempts >= maxAttempts) {
+                    console.error('MSAL library failed to load after ' + maxAttempts + ' attempts');
+                    clearInterval(checkMSAL);
+                    
+                    const statusDiv = document.getElementById('configStatus');
+                    if (statusDiv) {
+                        statusDiv.style.display = 'block';
+                        statusDiv.style.backgroundColor = '#fde7e9';
+                        statusDiv.style.color = '#d83b01';
+                        statusDiv.innerHTML = '<strong>Error:</strong> Authentication library failed to load.<br>' +
+                                            'This could be due to:<br>' +
+                                            '• Network/firewall blocking Microsoft CDN<br>' +
+                                            '• Browser extensions blocking scripts<br>' +
+                                            '• Corporate proxy settings<br><br>' +
+                                            'Try: Disabling ad blockers, using a different browser, or checking network settings.';
+                    }
+                } else {
+                    console.log('Waiting for MSAL... attempt ' + attempts + '/' + maxAttempts);
                 }
-                console.log('MSAL library loaded, initializing app...');
-                initializeApp();
-            }, 100);
+            }, 500);
         });
     </script>
 </body>
