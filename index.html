@@ -473,7 +473,7 @@
                 </div>
                 <div class="filter-group">
                     <label class="filter-label">Environment</label>
-                    <input type="text" id="environmentIdInput" class="filter-input" value="Default-30b2cab5-4b41-42ba-9ae3-af22c87241d9" readonly>
+                    <input type="text" id="environmentIdInput" class="filter-input" value="f40162db-928b-ed1f-acee-42430cc4291a" readonly>
                 </div>
             </div>
 
@@ -580,7 +580,7 @@
         // Configuration
         const config = {
             auth: {
-                clientId: '07d85d3a-2d71-451f-a148-3ab6a12cb2b1',
+                clientId: 'ebb6eb42-cb6c-4c0a-a401-99676eccadad',
                 authority: 'https://login.microsoftonline.com/30b2cab5-4b41-42ba-9ae3-af22c87241d9',
                 redirectUri: window.location.origin + '/',
                 navigateToLoginRequestUrl: false
@@ -616,7 +616,7 @@
             }
         };
 
-        const environmentId = 'Default-30b2cab5-4b41-42ba-9ae3-af22c87241d9';
+        const environmentId = 'f40162db-928b-ed1f-acee-42430cc4291a';
         
         // Initialize MSAL
         const msalInstance = new msal.PublicClientApplication(config);
@@ -1241,7 +1241,7 @@
             
             let statusHTML = '<strong>Configuration Check:</strong><br>';
             statusHTML += `✓ Client ID: ${config.auth.clientId}<br>`;
-            statusHTML += `✓ Tenant ID: 30b2cab5-4b41-42ba-9ae3-af22c87241d9<br>`;
+            statusHTML += `✓ Tenant ID: a53aff7b-e860-44b9-b853-b6d99bb663ef<br>`;
             statusHTML += `✓ Current URL: ${window.location.origin}/<br>`;
             statusHTML += `✓ Redirect URI: ${config.auth.redirectUri}<br>`;
             statusHTML += `✓ MSAL Library: ${typeof msal !== 'undefined' ? 'Loaded' : '<span style="color: red;">NOT LOADED</span>'}<br>`;
