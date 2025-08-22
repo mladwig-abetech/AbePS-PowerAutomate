@@ -1310,13 +1310,15 @@
                 this.msalInstances = new Map(); // Store MSAL instances per tenant
                 this.authMode = 'delegated';
                 
-                // Your app registration - MUST be configured as multi-tenant in Azure AD
+                // Your app registration - MUST be configured as multi-tenant SPA in Azure AD
                 this.appConfig = {
-                    clientId: 'ebb6eb42-cb6c-4c0a-a401-99676eccadad', // Replace with your multi-tenant app ID
-                    redirectUri: window.location.origin
+                    clientId: 'YOUR_MULTI_TENANT_APP_CLIENT_ID', // Replace with your multi-tenant app ID
+                    redirectUri: window.location.origin // Current domain
                 };
 
                 logger.log('MultiTenantAuthManager initialized', 'info');
+                logger.log('Current redirect URI will be: ' + this.appConfig.redirectUri, 'info');
+                logger.log('Make sure this URI is added to SPA redirect URIs in Azure AD', 'warning');
             }
 
             // Create MSAL instance for specific tenant
@@ -1326,11 +1328,19 @@
                         clientId: this.appConfig.clientId,
                         authority: `https://login.microsoftonline.com/${tenantId}`,
                         redirectUri: this.appConfig.redirectUri,
-                        navigateToLoginRequestUrl: false
+                        navigateToLoginRequestUrl: false,
+                        postLogoutRedirectUri: this.appConfig.redirectUri
                     },
                     cache: {
                         cacheLocation: 'sessionStorage',
                         storeAuthStateInCookie: false
+                    },
+                    system: {
+                        allowNativeBroker: false, // Disables WAM Broker
+                        windowHashTimeout: 60000,
+                        iframeHashTimeout: 6000,
+                        loadFrameTimeout: 0,
+                        allowRedirectInIframe: true
                     }
                 };
 
@@ -1416,8 +1426,11 @@
                             break;
                         case 'powerautomate':
                         default:
-                            // Power Automate uses different scopes
-                            scopes = ['https://service.flow.microsoft.com/.default'];
+                            // Try different Power Automate API scopes
+                            scopes = [
+                                'https://api.flow.microsoft.com/Flows.Read.All',
+                                'https://api.flow.microsoft.com/User'
+                            ];
                             break;
                     }
 
@@ -1432,6 +1445,13 @@
                         return response.accessToken;
                     } catch (silentError) {
                         logger.log('Silent token acquisition failed, trying popup', 'warning');
+                        
+                        // If specific scopes fail, try the .default scope
+                        if (apiType === 'powerautomate') {
+                            logger.log('Trying Power Automate .default scope', 'info');
+                            tokenRequest.scopes = ['https://api.flow.microsoft.com/.default'];
+                        }
+                        
                         const response = await msalInstance.acquireTokenPopup(tokenRequest);
                         logger.log('Token acquired via popup', 'success', { apiType });
                         return response.accessToken;
@@ -1554,7 +1574,12 @@
         // Power Automate API Client with Multi-Tenant Support
         class MultiTenantPowerAutomateAPI {
             constructor() {
-                this.baseUrl = 'https://api.flow.microsoft.com';
+                // Try different possible API endpoints
+                this.possibleEndpoints = [
+                    'https://api.flow.microsoft.com',
+                    'https://api.powerautomate.com', 
+                    'https://flow.microsoft.com/api'
+                ];
                 this.graphUrl = 'https://graph.microsoft.com';
                 this.managementUrl = 'https://management.azure.com';
                 this.demoMode = false;
@@ -1592,7 +1617,7 @@
                             apiType = 'management';
                             break;
                         default:
-                            // Power Automate API - correct endpoint
+                            // Power Automate API - try primary endpoint
                             url = `https://api.flow.microsoft.com/providers/Microsoft.ProcessSimple/environments/${environmentId}/flows?api-version=2016-11-01`;
                             apiType = 'powerautomate';
                     }
@@ -1617,16 +1642,19 @@
                         const errorText = await response.text();
                         logger.log('API request failed', 'error', { 
                             status: response.status,
-                            error: errorText 
+                            error: errorText,
+                            url: url
                         });
                         
                         // Provide specific error guidance
                         if (response.status === 401) {
                             throw new Error('Authentication failed. Check if the app has permissions in the target tenant.');
                         } else if (response.status === 403) {
-                            throw new Error('Access denied. Ensure the app registration has Power Automate API permissions and admin consent.');
+                            throw new Error('Access denied. Add Power Automate API permissions: Flows.Read.All, Flows.Manage.All, User');
                         } else if (response.status === 404) {
-                            throw new Error('Environment not found. Check the Environment ID.');
+                            throw new Error('Environment not found. Check the Environment ID or try demo mode.');
+                        } else if (response.status === 400 && errorText.includes('Invalid resource')) {
+                            throw new Error('Power Automate API permission missing. Add "Power Automate API" in Azure AD API permissions.');
                         }
                         
                         throw new Error(`API Error: ${response.status} - ${errorText}`);
@@ -2114,10 +2142,10 @@
             try {
                 showAlert('Testing connection to tenant...', 'warning');
                 
-                // Try to authenticate to the target tenant
+                // Step 1: Try to authenticate to the target tenant
                 await authManager.signInToTenant(config.targetTenantId);
                 
-                // Try to get a token for the specific API
+                // Step 2: Try to get a token for the specific API
                 const token = await authManager.getAccessTokenForTenant(
                     config.targetTenantId, 
                     config.connectionType || 'powerautomate'
@@ -2130,8 +2158,20 @@
                     throw new Error('Failed to obtain API access token');
                 }
             } catch (error) {
-                showAlert(`Connection test failed: ${error.message}`, 'error');
                 logger.log('Connection test error', 'error', error);
+                
+                // Provide specific guidance for Power Automate API errors
+                if (error.message && error.message.includes('AADSTS650057')) {
+                    showAlert('Power Automate API permission missing. Add "Power Automate API" permissions in Azure AD.', 'error');
+                    logger.log('SOLUTION: Add Power Automate API permissions:', 'warning');
+                    logger.log('1. Go to Azure Portal > App Registrations > Your App', 'warning');
+                    logger.log('2. API Permissions > Add permission > APIs my org uses', 'warning');
+                    logger.log('3. Search for "Power Automate API" or "Microsoft Flow Service"', 'warning');
+                    logger.log('4. Add Flows.Read.All, Flows.Manage.All, and User permissions', 'warning');
+                    logger.log('5. Grant admin consent', 'warning');
+                } else {
+                    showAlert(`Connection test failed: ${error.message}`, 'error');
+                }
             }
         }
 
@@ -2249,15 +2289,29 @@
 
             // Important setup instructions
             logger.log('SETUP REQUIRED:', 'warning');
-            logger.log('1. Register a multi-tenant app in Azure AD', 'warning');
-            logger.log('2. Update YOUR_MULTI_TENANT_APP_CLIENT_ID in the code', 'warning');
-            logger.log('3. Configure API permissions for Power Automate/Graph', 'warning');
-            logger.log('4. Grant admin consent in target tenants', 'warning');
+            logger.log('1. Register app as SINGLE-PAGE APPLICATION in Azure AD', 'warning');
+            logger.log('2. Add redirect URI to SPA section (not Web section)', 'warning');
+            logger.log('3. Current redirect URI: ' + window.location.origin, 'warning');
+            logger.log('4. Update YOUR_MULTI_TENANT_APP_CLIENT_ID in the code', 'warning');
+            logger.log('5. Configure API permissions and grant consent', 'warning');
             logger.log('', 'info');
-            logger.log('RECOMMENDED API PERMISSIONS:', 'info');
-            logger.log('- Microsoft Graph: User.Read (delegated)', 'info');
-            logger.log('- Power Platform API: User (delegated)', 'info');
-            logger.log('- Azure Service Management: user_impersonation (delegated)', 'info');
+            logger.log('AZURE APP REGISTRATION CHECKLIST:', 'info');
+            logger.log('✓ Application Type: Single-page application', 'info');
+            logger.log('✓ Supported account types: Multi-tenant', 'info');
+            logger.log('✓ Authentication > SPA redirect URIs: ' + window.location.origin, 'info');
+            logger.log('✓ Authentication > Implicit grants: Access tokens + ID tokens', 'info');
+            logger.log('', 'info');
+            logger.log('REQUIRED API PERMISSIONS:', 'warning');
+            logger.log('1. Microsoft Graph API:', 'info');
+            logger.log('   - User.Read (Delegated)', 'info');
+            logger.log('2. Power Automate API / Microsoft Flow Service:', 'warning');
+            logger.log('   - Flows.Read.All (Delegated)', 'warning');
+            logger.log('   - Flows.Manage.All (Delegated)', 'warning');  
+            logger.log('   - User (Delegated)', 'warning');
+            logger.log('3. Azure Service Management (optional):', 'info');
+            logger.log('   - user_impersonation (Delegated)', 'info');
+            logger.log('', 'info');
+            logger.log('💡 TIP: Search for "Power Automate API" or "Microsoft Flow Service" in API permissions', 'info');
         });
     </script>
 </body>
